@@ -48,11 +48,14 @@ def publicar(distancia):
 # Função principal para iniciar as medições continuamente
 def iniciar_medicoes():
     while True:
-        distancia = medir_distancia()
-        print(f"Distância medida: {distancia} cm")
-        if check_saude_sensor(distancia):
-            salvar_no_bd(distancia)
-        time.sleep(10)
+	try:
+        	distancia = medir_distancia()
+        	print(f"Distância medida: {distancia} cm")
+		publicar(distancia)
+	except Exeption as e:
+		print(f"Erro ao medir ou publicar: {e}")
+	
+	time.sleep(10)
 
 if __name__ == "__main__":
     try:
@@ -61,3 +64,4 @@ if __name__ == "__main__":
         print("\nEncerrando...")
     finally:
         GPIO.cleanup()
+print(f"Erro ao medir ou publicar: {e}")print(f"Erro ao medir ou publicar: {e}")
