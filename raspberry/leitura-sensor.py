@@ -48,11 +48,13 @@ def publicar(distancia):
 # Função principal para iniciar as medições continuamente
 def iniciar_medicoes():
     while True:
-        distancia = medir_distancia()
-        print(f"Distância medida: {distancia} cm")
-        if check_saude_sensor(distancia):
-            salvar_no_bd(distancia)
-        time.sleep(10)
+        try:
+            distancia = medir_distancia()
+            print(f"Distância medida: {distancia} cm")
+            publicar(distancia)
+        except Exception as e:
+            print(f"Erro ao medir ou publicar: {e}")
+        time.sleep(10)  # mede a cada 10 segundos
 
 if __name__ == "__main__":
     try:
