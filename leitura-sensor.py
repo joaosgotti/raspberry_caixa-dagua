@@ -1,9 +1,9 @@
-import sqlite3
 import time
 import datetime
-import threading
 import os
 import RPi.GPIO as GPIO
+import paho.mqtt.client as mqtt
+import json
 
 # Configuração do GPIO
 GPIO.setwarnings(False)
@@ -13,9 +13,10 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setup(TRIG, GPIO.OUT)
 GPIO.setup(ECHO, GPIO.IN)
 
-# Define o caminho correto do banco de dados
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "leituras.db")
+# Definir Broker MQTT
+MQTT_BROKER = "localhost"
+MQTT_PORT = 1883
+MQTT_TOPIC = "sensor/distancia"
 
 # Função para medir a distância
 def medir_distancia():
@@ -35,36 +36,14 @@ def medir_distancia():
     distancia = pulse_duration * 17150
     return round(distancia, 2)
 
-def check_saude_sensor(distancia):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT
-    conn.commit()
-    conn.close()
-    return True
 
-# Função para salvar no banco de dados
-def salvar_no_bd(distancia):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("INSERT INTO leituras (timestamp, distancia) VALUES (?, ?)", (timestamp, distancia))
-    conn.commit()
-    conn.close()
-
-# Criando a tabela no banco de dados
-def criar_tabela():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS leituras (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT,
-        distancia REAL
-    )
-    ''')
-    conn.commit()
-    conn.close()
+# Função para publicar no mqtt
+def publicar(distancia):
+    payload = {
+        "distancia": distancia,
+        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    client.publish("sensor/distancia", json.dumps(payload))
 
 # Função principal para iniciar as medições continuamente
 def iniciar_medicoes():
@@ -75,6 +54,10 @@ def iniciar_medicoes():
             salvar_no_bd(distancia)
         time.sleep(10)
 
-# Criar tabela no banco e iniciar medições
-criar_tabela()
-iniciar_medicoes()
+if __name__ == "__main__":
+    try:
+        iniciar_medicoes()
+    except KeyboardInterrupt:
+        print("\nEncerrando...")
+    finally:
+        GPIO.cleanup()
