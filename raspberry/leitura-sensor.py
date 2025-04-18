@@ -18,6 +18,10 @@ MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 MQTT_TOPIC = "sensor/distancia"
 
+# Cliente MQTT
+client = mqtt.Client()
+client.connect(MQTT_BROKER, MQTT_PORT, 60)
+
 # Função para medir a distância
 def medir_distancia():
     GPIO.output(TRIG, GPIO.LOW)
@@ -36,26 +40,24 @@ def medir_distancia():
     distancia = pulse_duration * 17150
     return round(distancia, 2)
 
-
 # Função para publicar no mqtt
 def publicar(distancia):
     payload = {
         "distancia": distancia,
         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
-    client.publish("sensor/distancia", json.dumps(payload))
+    client.publish(MQTT_TOPIC, json.dumps(payload))
 
 # Função principal para iniciar as medições continuamente
 def iniciar_medicoes():
     while True:
-	try:
-        	distancia = medir_distancia()
-        	print(f"Distância medida: {distancia} cm")
-		publicar(distancia)
-	except Exeption as e:
-		print(f"Erro ao medir ou publicar: {e}")
-	
-	time.sleep(10)
+        try:
+            distancia = medir_distancia()
+            print(f"Distância medida: {distancia} cm")
+            publicar(distancia)
+        except Exception as e:
+            print(f"Erro ao medir ou publicar: {e}")
+        time.sleep(10)
 
 if __name__ == "__main__":
     try:
@@ -64,4 +66,3 @@ if __name__ == "__main__":
         print("\nEncerrando...")
     finally:
         GPIO.cleanup()
-print(f"Erro ao medir ou publicar: {e}")print(f"Erro ao medir ou publicar: {e}")

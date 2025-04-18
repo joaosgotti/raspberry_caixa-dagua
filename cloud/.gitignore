@@ -1,7 +1,7 @@
 # Ignorar o diretório do ambiente virtual
-venv-rasp/
+venv-cloud/
 # ou, se o nome do seu ambiente virtual for diferente, como .venv
-.venv-rasp/
+.venv-cloud/
 
 # Ignorar arquivos de log
 *.log
