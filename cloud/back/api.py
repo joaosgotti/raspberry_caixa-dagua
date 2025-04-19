@@ -1,121 +1,129 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException # Import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import RealDictCursor # Para retornar resultados como dicionários
 from datetime import datetime, timedelta
 import os
-# dotenv import load_dotenv # <-- TYPO AQUI!
-from dotenv import load_dotenv # <-- CORREÇÃO
+from dotenv import load_dotenv # CORRIGIDO: from ... import ...
 
-load_dotenv() # OK
+# Carrega variáveis de ambiente do arquivo .env (se existir)
+load_dotenv()
 
-app = FastAPI() # OK
+# Cria a instância da aplicação FastAPI
+app = FastAPI()
 
-# CORS Middleware: OK (talvez restringir origins em produção)
+# Configura CORS para permitir acesso de qualquer origem (ajuste em produção se necessário)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"], # Permite todas as origens
+    allow_credentials=True,
+    allow_methods=["*"], # Permite todos os métodos (GET, POST, etc.)
+    allow_headers=["*"], # Permite todos os cabeçalhos
 )
 
-# Conexão com o banco (Duplicada, mas funcional)
-# import os              # Já importado
-# import psycopg2        # Já importado
-# from dotenv import load_dotenv # Já importado e chamado
-
-# load_dotenv() # Já chamado
-
-# Esta função connect_db é IDÊNTICA à do listener e parece CORRETA (usa env vars)
+# --- Função de Conexão com o Banco de Dados ---
+# (Versão corrigida, igual à do listener)
 def connect_db():
     """
-    Connects to the PostgreSQL database using credentials from environment variables...
+    Connects to the PostgreSQL database using credentials from environment variables.
+    Returns a connection object or None if connection fails or variables are missing.
     """
-    # ... (código da função connect_db que usa os.getenv) ...
-    # Verifica se as variáveis mais críticas foram definidas
     db_name = os.getenv("DB_NAME")
     db_user = os.getenv("DB_USER")
     db_password = os.getenv("DB_PASSWORD")
     db_host = os.getenv("DB_HOST")
     db_port = os.getenv("DB_PORT", "5432")
 
-    required_vars = { # ... (verificação de vars) ... }
+    required_vars = {
+        'DB_NAME': db_name,
+        'DB_USER': db_user,
+        'DB_PASSWORD': db_password,
+        'DB_HOST': db_host
+    }
+    # CORRIGIDO: Verifica se algum valor é None ou vazio
     missing_vars = [k for k, v in required_vars.items() if not v]
+
+    # CORRIGIDO: Checa se a lista não está vazia
     if missing_vars:
-        # ... (print erro e return None) ...
-        print(f"Erro Crítico: Variáveis de ambiente do banco de dados ausentes: {', '.join(missing_vars)}")
-        return None
+        print(f"API Erro: Variáveis de ambiente do banco de dados ausentes: {', '.join(missing_vars)}")
+        return None # Retorna None se faltar variável essencial
 
     try:
-        # ... (tentativa de conexão com logs) ...
-        print(f"Tentando conectar ao DB: host={db_host}, db={db_name}, user={db_user}...") # Log útil
+        # Log removido daqui para não poluir logs da API a cada request
+        # print(f"API Tentando conectar ao DB: host={db_host}...")
         connection = psycopg2.connect(
-            dbname=db_name, user=db_user, password=db_password, host=db_host, port=db_port
+            dbname=db_name,
+            user=db_user,
+            password=db_password,
+            host=db_host,
+            port=db_port
         )
-        print("Conexão com o banco de dados estabelecida com sucesso!")
+        # print("API Conexão com DB estabelecida.") # Log opcional
         return connection
     except psycopg2.OperationalError as e:
-        # ... (print erro e return None) ...
-        print(f"Erro OPERACIONAL ao conectar ao banco de dados: {e}")
+        print(f"API Erro OPERACIONAL ao conectar ao banco de dados: {e}")
         return None
     except psycopg2.Error as e:
-        # ... (print erro e return None) ...
-        print(f"Erro psycopg2 ao conectar ao banco de dados: {e}")
+        print(f"API Erro psycopg2 ao conectar ao banco de dados: {e}")
         return None
     except Exception as e:
-         # ... (print erro e return None) ...
-         print(f"Erro INESPERADO durante a conexão com o banco de dados: {e}")
+         print(f"API Erro INESPERADO durante a conexão com o banco de dados: {e}")
          return None
 
-# Endpoint /ultima-leitura: Parece CORRETO
+# --- Endpoints da API ---
+
 @app.get("/ultima-leitura")
-def ultima_leitura():
-    conn = connect_db()
-    # Adicionar verificação se a conexão falhou
-    if not conn:
-        # Retornar um erro HTTP apropriado
-        from fastapi import HTTPException
-        raise HTTPException(status_code=503, detail="Não foi possível conectar ao banco de dados")
-
-    result = None # Inicializa result
+def get_ultima_leitura(): # Renomeado para seguir convenção Python
+    """Busca a leitura mais recente do banco de dados."""
+    conn = None # Inicializa conn fora do try
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT * FROM leituras ORDER BY timestamp DESC LIMIT 1;")
-        result = cur.fetchone()
-        cur.close()
-    except Exception as e:
-         print(f"Erro ao buscar última leitura: {e}")
-         # Retornar um erro HTTP apropriado
-         from fastapi import HTTPException
-         raise HTTPException(status_code=500, detail="Erro ao buscar dados no banco")
+        conn = connect_db()
+        if not conn:
+            # Erro já logado em connect_db
+            raise HTTPException(status_code=503, detail="Serviço indisponível: Falha na conexão com o banco de dados")
+
+        with conn.cursor(cursor_factory=RealDictCursor) as cur: # Usar 'with' garante fechamento do cursor
+            cur.execute("SELECT * FROM leituras ORDER BY timestamp DESC LIMIT 1;")
+            result = cur.fetchone()
+            # print(f"API /ultima-leitura: Resultado={result}") # Log opcional
+
+        return result if result else {} # Retorna {} se não encontrar nada
+
+    except HTTPException as http_exc:
+        raise http_exc # Re-levanta exceções HTTP já tratadas
+    except (Exception, psycopg2.Error) as e:
+        print(f"API Erro em /ultima-leitura: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno do servidor ao buscar última leitura")
     finally:
         if conn:
-            conn.close() # Garante que a conexão seja fechada
-    return result if result else {} # Retorna {} se nada for encontrado
+            conn.close() # Garante fechamento da conexão
 
-# Endpoint /ultimas-24h: Parece CORRETO
 @app.get("/ultimas-24h")
-def ultimas_24h():
-    conn = connect_db()
-    # Adicionar verificação se a conexão falhou
-    if not conn:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=503, detail="Não foi possível conectar ao banco de dados")
-
-    resultados = [] # Inicializa resultados
+def get_ultimas_24h(): # Renomeado para seguir convenção Python
+    """Busca as leituras das últimas 24 horas do banco de dados."""
+    conn = None # Inicializa conn fora do try
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        limite = datetime.now() - timedelta(hours=24)
-        cur.execute("SELECT * FROM leituras WHERE timestamp >= %s ORDER BY timestamp ASC;", (limite,))
-        resultados = cur.fetchall()
-        cur.close()
-    except Exception as e:
-         print(f"Erro ao buscar últimas 24h: {e}")
-         from fastapi import HTTPException
-         raise HTTPException(status_code=500, detail="Erro ao buscar dados no banco")
+        conn = connect_db()
+        if not conn:
+            raise HTTPException(status_code=503, detail="Serviço indisponível: Falha na conexão com o banco de dados")
+
+        with conn.cursor(cursor_factory=RealDictCursor) as cur: # Usar 'with'
+            limite_tempo = datetime.now() - timedelta(hours=24)
+            # Usar placeholder %s é mais seguro contra SQL Injection
+            cur.execute("SELECT * FROM leituras WHERE timestamp >= %s ORDER BY timestamp ASC;", (limite_tempo,))
+            resultados = cur.fetchall()
+            # print(f"API /ultimas-24h: Resultados encontrados={len(resultados)}") # Log opcional
+
+        return resultados
+
+    except HTTPException as http_exc:
+        raise http_exc
+    except (Exception, psycopg2.Error) as e:
+        print(f"API Erro em /ultimas-24h: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno do servidor ao buscar histórico")
     finally:
         if conn:
-            conn.close() # Garante que a conexão seja fechada
-    return resultados
+            conn.close()
 
-# Não há bloco if __name__ == "__main__": uvicorn.run(...) - CORRETO para Render
+# Nota: Nenhum bloco if __name__ == "__main__": uvicorn.run(...) aqui,
+# o que está correto para deploy no Render onde o comando de start é definido externamente.

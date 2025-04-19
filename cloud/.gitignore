@@ -5,7 +5,7 @@ venv/
 .venv/
 env/
 *.venv
-
+.env
 # Arquivos de Ambiente (Contém segredos!)
 .env
 *.env.local
