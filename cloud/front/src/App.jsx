@@ -83,7 +83,7 @@ function App() {
     // 1. Busca Inicial da Última Leitura
     console.log("Buscando última leitura inicial...");
     fetchData(
-      "https://caixa-dagua-api.onrender.com/ultima-leitura",
+      "https://projeto-caixa-dagua-api.onrender.com/ultima-leitura",
       setUltimaLeitura,
       setIsLoadingUltimaInicial, // Usa o estado de loading inicial
       setErro
@@ -94,7 +94,7 @@ function App() {
     const intervalId = setInterval(() => {
       console.log("Polling: Buscando última leitura...");
       fetchData(
-        "https://caixa-dagua-api.onrender.com/ultima-leitura",
+        "https://projeto-caixa-dagua-api.onrender.com/ultima-leitura",
         setUltimaLeitura,
         null, // Não passa o setLoading para não piscar o spinner principal
         setErro,
