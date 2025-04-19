@@ -64,7 +64,7 @@ function App() {
   useEffect(() => {
     console.log("Buscando histórico inicial (24h)...");
     fetchData(
-      "https://caixa-dagua-api.onrender.com/ultimas-24h",
+      "https://projeto-caixa-dagua-api.onrender.com/ultimas-24h",
       (data) => {
         const formattedData = data.map(item => ({
           ...item,
