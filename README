@@ -1,0 +1,216 @@
+# 💧 Monitoramento Remoto de Caixa d'Água
+
+Este projeto implementa um sistema completo para monitorar o nível de uma caixa d'água usando um sensor ultrassônico conectado a uma Raspberry Pi. Os dados são enviados via MQTT para um listener, armazenados em um banco de dados PostgreSQL e visualizados em uma interface web React moderna.
+
+**Funcionalidades Principais:**
+
+*   Leitura de distância usando sensor ultrassônico HC-SR04.
+*   Cálculo da mediana de múltiplas leituras na Raspberry Pi para maior estabilidade.
+*   Publicação dos dados via MQTT para um broker na nuvem (HiveMQ Cloud).
+*   Armazenamento das leituras em um banco de dados PostgreSQL na nuvem (Render).
+*   API RESTful (FastAPI) para consultar os dados armazenados.
+*   Interface web (React) mostrando a última leitura e um gráfico histórico das últimas 24 horas.
+*   Atualização periódica da última leitura no frontend (polling).
+*   Deploy dos componentes de backend (API) e frontend na nuvem (Render).
+
+## Arquitetura do Sistema
+
+O fluxo de dados segue esta ordem:
+
+1.  **Raspberry Pi (Sensor Script):** Mede a distância -> Calcula mediana -> Publica no Broker MQTT.
+2.  **HiveMQ Cloud:** Recebe e roteia as mensagens MQTT.
+3.  **Raspberry Pi (Listener Script):** Assina o tópico no HiveMQ Cloud -> Recebe mensagens -> Conecta ao Banco de Dados na Nuvem -> Insere os dados.
+4.  **Render PostgreSQL DB:** Armazena os dados históricos.
+5.  **Render Web Service (API):** Expõe endpoints (`/ultima-leitura`, `/ultimas-24h`) -> Consulta o Banco de Dados na Nuvem quando requisitado.
+6.  **Render Static Site (Frontend):** Carrega a interface no navegador -> Faz requisições HTTP para a API na Nuvem -> Exibe os dados e o gráfico.
+
+## Tecnologias Utilizadas
+
+*   **Hardware:** Raspberry Pi, Sensor Ultrassônico HC-SR04
+*   **Linguagem Principal:** Python 3
+*   **Raspberry Pi:**
+    *   `RPi.GPIO`: Controle dos pinos GPIO.
+    *   `paho-mqtt`: Cliente MQTT para publicação.
+    *   `statistics`: Cálculo da mediana.
+    *   `screen`: Para rodar scripts em background.
+*   **Comunicação:** MQTT
+*   **Broker MQTT:** HiveMQ Cloud (Plano Gratuito)
+*   **Banco de Dados:** PostgreSQL (Render Free Tier)
+*   **Backend (API + Listener):**
+    *   `paho-mqtt`: Cliente MQTT para subscrição (listener).
+    *   `psycopg2-binary`: Driver PostgreSQL.
+    *   `fastapi`: Framework para API web.
+    *   `uvicorn`: Servidor ASGI para FastAPI.
+    *   `python-dotenv`: Gerenciamento de variáveis de ambiente locais.
+*   **Frontend:**
+    *   React (com Vite)
+    *   Tailwind CSS: Estilização.
+    *   Recharts: Biblioteca de gráficos.
+    *   `fetch` API: Requisições HTTP.
+*   **Hospedagem:** Render (Web Service, Static Site, PostgreSQL)
+
+## Pré-requisitos
+
+*   Raspberry Pi configurada com acesso à internet e Python 3.
+*   Sensor HC-SR04 conectado aos pinos GPIO corretos (definidos no script).
+*   Conta no GitHub (ou GitLab).
+*   Git instalado localmente e na Pi.
+*   Python 3 e Pip instalados localmente (para testar backend) e na Pi.
+*   Node.js e Yarn (ou NPM) instalados localmente (para frontend).
+*   Conta no [Render](https://render.com/).
+*   Conta no [HiveMQ Cloud](https://www.hivemq.com/cloud/).
+*   (Opcional) Cliente MQTT (ex: MQTT Explorer) para debug.
+*   (Opcional) Cliente PostgreSQL (ex: DBeaver, pgAdmin) para gerenciar o banco.
+
+## Configuração
+
+1.  **Clonar o Repositório:**
+    ```bash
+    git clone https://github.com/joaosgotti/projeto-caixa-dagua.git
+    cd projeto-caixa-dagua
+    ```
+    Faça isso tanto no seu PC quanto na Raspberry Pi.
+
+2.  **Configurar Banco de Dados (Render):**
+    *   Crie um banco de dados PostgreSQL gratuito no Render.
+    *   Anote as credenciais externas (Host, Porta, DB Name, User, Password).
+    *   Use um cliente SQL (como DBeaver) para conectar ao DB Render e execute o SQL abaixo para criar a tabela:
+      ```sql
+      CREATE TABLE IF NOT EXISTS leituras (
+          id SERIAL PRIMARY KEY,
+          distancia REAL NOT NULL,
+          timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_leituras_timestamp ON leituras (timestamp DESC);
+      ```
+
+3.  **Configurar Broker MQTT (HiveMQ Cloud):**
+    *   Crie um cluster gratuito no HiveMQ Cloud.
+    *   Crie credenciais de acesso (Username, Password) para o cluster.
+    *   Anote o Host, Porta (8883 para TLS) e as credenciais criadas.
+
+4.  **Configurar Backend (API e Listener - Localmente):**
+    *   Navegue até a pasta do backend (ex: `cloud/back`).
+    *   (Recomendado) Crie e ative um ambiente virtual Python:
+        ```bash
+        python -m venv venv-cloud
+        # Windows: .\venv-cloud\Scripts\activate
+        # Linux/macOS: source venv-cloud/bin/activate
+        ```
+    *   Instale as dependências Python:
+        ```bash
+        pip install -r requirements.txt
+        ```
+    *   Crie um arquivo `.env` nesta pasta.
+    *   Copie o conteúdo de um possível `.env.example` (se existir) ou adicione manualmente as variáveis com as credenciais **dos serviços na nuvem** (Render DB e HiveMQ Cloud):
+        ```dotenv
+        # .env (Exemplo - PREENCHA COM SEUS VALORES REAIS!)
+        DB_NAME=seu_render_db_name
+        DB_USER=seu_render_db_user
+        DB_PASSWORD=seu_render_db_password
+        DB_HOST=seu_render_db_host_externo
+        DB_PORT=5432
+        MQTT_BROKER=seu_hivemq_host
+        MQTT_PORT=8883
+        MQTT_USER=seu_hivemq_user
+        MQTT_PASSWORD=seu_hivemq_password
+        ```
+    *   **IMPORTANTE:** Adicione `.env` ao seu arquivo `.gitignore`.
+
+5.  **Configurar Frontend (Localmente):**
+    *   Navegue até a pasta do frontend (ex: `cloud/front`).
+    *   Instale as dependências Node.js:
+        ```bash
+        yarn install
+        # ou: npm install
+        ```
+    *   **IMPORTANTE:** Edite o arquivo React (provavelmente `src/App.jsx`) e atualize a variável `apiUrl` para a URL pública que **será gerada** pelo Render para sua API (você fará isso de fato *antes* do deploy final do frontend).
+
+6.  **Configurar Raspberry Pi:**
+    *   Certifique-se de que o código mais recente está na Pi (`git pull`).
+    *   Instale as dependências Python na Pi:
+        ```bash
+        sudo pip3 install paho-mqtt RPi.GPIO # Statistics é built-in
+        # Instale psycopg2 e dotenv se for rodar o listener aqui
+        sudo pip3 install psycopg2-binary python-dotenv
+        ```
+    *   **Editar `leitura-sensor.py`:** Atualize as variáveis `MQTT_BROKER`, `MQTT_PORT`, `MQTT_USER`, `MQTT_PASSWORD` no topo do script com suas credenciais **do HiveMQ Cloud**.
+    *   **SE FOR RODAR O LISTENER NA PI:**
+        *   Navegue até a pasta do listener na Pi (ex: `cloud/back`).
+        *   Crie o arquivo `.env` **na Pi** com as credenciais do **Render DB** e **HiveMQ Cloud** (igual ao passo 4).
+        *   Torne os scripts `.sh` executáveis (se os criou):
+            ```bash
+            chmod +x run_sensor.sh
+            # chmod +x mqtt_listener.sh # Se existir um script para ele
+            ```
+
+## Executando Localmente (Para Teste)
+
+1.  **Listener MQTT (na Pi):**
+    *   Conecte via SSH na Pi.
+    *   Navegue até a pasta do listener (ex: `cloud/back`).
+    *   Inicie usando `screen` para persistência:
+        ```bash
+        screen -S mqtt_listener
+        python3 mqtt_listener.py
+        # Pressione Ctrl+A, depois D para desanexar
+        ```
+2.  **API FastAPI (no seu PC):**
+    *   Abra um terminal no seu PC.
+    *   Navegue até a pasta do backend (ex: `cloud/back`).
+    *   Ative o ambiente virtual.
+    *   Execute:
+        ```bash
+        python -m uvicorn back.api:app --reload --port 8000
+        ```
+        *(Ajuste `back.api:app` conforme sua estrutura)*
+3.  **Frontend React (no seu PC):**
+    *   Abra **outro** terminal no seu PC.
+    *   Navegue até a pasta do frontend (ex: `cloud/front`).
+    *   Execute:
+        ```bash
+        yarn dev
+        # ou: npm run dev
+        ```
+4.  **Sensor (na Pi):**
+    *   Conecte via SSH na Pi (se não estiver conectado).
+    *   Navegue até a pasta do sensor (ex: `raspberry`).
+    *   Inicie usando o script de controle ou `screen`:
+        ```bash
+        ./run_sensor.sh start
+        # ou:
+        # screen -S sensor
+        # sudo python3 leitura-sensor.py
+        # # Pressione Ctrl+A, depois D para desanexar
+        ```
+5.  Acesse o frontend no seu navegador (geralmente `http://localhost:5173`).
+
+## Deploy na Nuvem (Render)
+
+1.  **API (Web Service):**
+    *   Crie um "Web Service" no Render conectado ao seu repo.
+    *   **Root Directory:** Pasta do backend (ex: `cloud/back` ou deixe em branco).
+    *   **Build Command:** `pip install -r requirements.txt`
+    *   **Start Command:** `uvicorn back.api:app --host 0.0.0.0 --port $PORT` (Ajuste `back.api:app`).
+    *   **Environment Variables:** Configure TODAS as variáveis `DB_*` e `MQTT_*` com os valores dos serviços na nuvem.
+    *   Aguarde o deploy e anote a URL pública gerada (ex: `https://sua-api.onrender.com`).
+
+2.  **Listener MQTT (Rodando na Pi):**
+    *   Conforme decidido, o listener roda na Raspberry Pi usando `screen` (veja passo 6 da Configuração e passo 1 da Execução Local). Certifique-se que ele está configurado com as credenciais corretas do Render DB e HiveMQ Cloud.
+
+3.  **Frontend (Static Site):**
+    *   **Atualize a URL da API** no seu código React para a URL pública do Web Service gerada no passo 1 do deploy. Faça commit e push dessa mudança.
+    *   Crie um "Static Site" no Render conectado ao seu repo.
+    *   **Root Directory:** Pasta do frontend (ex: `cloud/front`).
+    *   **Build Command:** `yarn install && yarn build` (ou `npm install && npm run build`).
+    *   **Publish Directory:** `dist` (para Vite).
+    *   Aguarde o deploy. Acesse a URL pública gerada para o frontend.
+
+## Scripts de Controle (Raspberry Pi)
+
+*   `raspberry/run_sensor.sh`: Usado para gerenciar o script `leitura-sensor.py`.
+    *   `./run_sensor.sh start`: Inicia o sensor em background (via `screen`).
+    *   `./run_sensor.sh stop`: Para o sensor.
+    *   `./run_sensor.sh view`: Mostra a saída do sensor (anexa ao `screen`).
+
+---
