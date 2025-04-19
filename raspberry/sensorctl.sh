@@ -2,112 +2,85 @@
 
 # --- Configuração ---
 SCRIPT_NAME="leitura-sensor.py"
-SESSION_NAME="caixa_dagua_sensor" # Nome para a sessão screen
-# Obtém o diretório onde este script shell está localizado
+SESSION_NAME="caixa_dagua_sensor" # Nome da sessão screen
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 PYTHON_SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_NAME"
 # --- Fim da Configuração ---
 
-# Função para verificar se a sessão screen está rodando
+# Função para mostrar o menu de uso
+show_usage() {
+  echo "" # Linha em branco para separar
+  echo "--------------------------------------------------"
+  echo "Script para controlar o sensor da caixa d'água."
+  echo "Uso: $0 {start|stop|view}"
+  echo "  start : Inicia o sensor em background."
+  echo "  stop  : Para o sensor."
+  echo "  view  : Mostra a saída atual (Ctrl+A, D para sair)."
+  echo "--------------------------------------------------"
+}
+
+# Verifica se a sessão screen específica está rodando
 is_running() {
-  screen -ls | grep -q "$SESSION_NAME"
+  screen -ls | grep -q "\.$SESSION_NAME"
 }
 
-# Função para iniciar o sensor
-start_sensor() {
-  if is_running; then
-    echo "O script do sensor já está rodando na sessão screen '$SESSION_NAME'."
-    echo "Para ver a saída, use: screen -r $SESSION_NAME"
-  else
-    echo "Iniciando o script '$SCRIPT_NAME' na sessão screen '$SESSION_NAME'..."
-    # Verifica se o script Python existe
-    if [ ! -f "$PYTHON_SCRIPT_PATH" ]; then
-        echo "Erro: Script Python '$PYTHON_SCRIPT_PATH' não encontrado!"
-        exit 1
-    fi
-    # Inicia o screen em modo detached (-d), cria (-m), nomeia (-S) e executa o comando
-    # O comando é executado com sudo e python3
-    screen -dmS "$SESSION_NAME" sudo python3 "$PYTHON_SCRIPT_PATH"
-    sleep 1 # Pequena pausa para dar tempo ao screen de iniciar
-    if is_running; then
-      echo "Script iniciado com sucesso em background."
-      echo "Para ver a saída, use: screen -r $SESSION_NAME"
-      echo "(Dentro do screen, use Ctrl+A, D para desanexar sem parar o script)"
-    else
-      echo "Erro ao iniciar a sessão screen '$SESSION_NAME'. Verifique as permissões ou logs."
-    fi
-  fi
-}
+# Ação baseada no argumento ($1)
+ACTION_PERFORMED=0 # Flag para saber se alguma ação foi feita
 
-# Função para parar o sensor
-stop_sensor() {
-  if is_running; then
-    echo "Parando a sessão screen '$SESSION_NAME'..."
-    # Envia o comando 'quit' para a sessão screen específica
-    screen -X -S "$SESSION_NAME" quit
-    sleep 1 # Pausa para terminação
-    if is_running; then
-        echo "Falha ao parar a sessão. Tentando forçar com kill (pode levar alguns segundos)..."
-        # Tenta matar o processo se o quit falhou (abordagem mais agressiva)
-        pkill -f "SCREEN.*$SESSION_NAME.*$SCRIPT_NAME"
-        sleep 2
-        if is_running; then
-            echo "Erro: Não foi possível parar a sessão '$SESSION_NAME'. Verifique manualmente."
-        else
-            echo "Sessão forçada a parar."
-        fi
-    else
-        echo "Sessão screen '$SESSION_NAME' parada."
-    fi
-  else
-    echo "O script do sensor não está rodando na sessão screen '$SESSION_NAME'."
-  fi
-}
-
-# Função para ver o status/logs
-show_status() {
-  if is_running; then
-    echo "O script do sensor está RODANDO na sessão screen '$SESSION_NAME'."
-    echo "Para anexar e ver a saída ao vivo, use: screen -r $SESSION_NAME"
-    echo "(Use Ctrl+A, D para desanexar novamente)"
-  else
-    echo "O script do sensor NÃO está rodando."
-    # Verifica se há um nohup.out de execuções anteriores (opcional)
-    # if [ -f "$SCRIPT_DIR/nohup.out" ]; then
-    #   echo "Últimas linhas do log nohup.out (se houver):"
-    #   tail "$SCRIPT_DIR/nohup.out"
-    # fi
-  fi
-}
-
-# Processa os argumentos da linha de comando
 case "$1" in
   start)
-    start_sensor
+    ACTION_PERFORMED=1
+    if is_running; then
+      echo "Sensor já está rodando na sessão '$SESSION_NAME'."
+    else
+      echo "Iniciando sensor em background via screen ('$SESSION_NAME')..."
+      if [ ! -f "$PYTHON_SCRIPT_PATH" ]; then
+          echo "Erro: Script Python '$PYTHON_SCRIPT_PATH' não encontrado!"
+          exit 1
+      fi
+      screen -dmS "$SESSION_NAME" sudo python3 "$PYTHON_SCRIPT_PATH"
+      sleep 1
+      if is_running; then
+          echo "Sensor iniciado."
+      else
+          echo "Erro ao iniciar o sensor no screen."
+      fi
+    fi
     ;;
   stop)
-    stop_sensor
-    ;;
-  restart)
-    stop_sensor
-    start_sensor
-    ;;
-  status)
-    show_status
-    ;;
-  log | attach | view) # Atalho para ver a saída
+    ACTION_PERFORMED=1
     if is_running; then
-        echo "Anexando à sessão '$SESSION_NAME'... (Use Ctrl+A, D para desanexar)"
-        screen -r "$SESSION_NAME"
+      echo "Parando sessão screen '$SESSION_NAME'..."
+      screen -X -S "$SESSION_NAME" quit
+      sleep 1
+       if ! is_running; then
+            echo "Sensor parado."
+       else
+            echo "Falha ao parar. Tente manualmente com 'screen -ls' e 'kill'."
+       fi
     else
-        echo "O script não está rodando. Não há sessão para anexar."
-        # show_status # Mostra status se não estiver rodando
+      echo "Sensor não estava rodando."
+    fi
+    ;;
+  view|log|attach)
+    ACTION_PERFORMED=1 # Consideramos view como uma ação
+    if is_running; then
+      echo "Anexando à sessão '$SESSION_NAME'... (Use Ctrl+A, D para desanexar)"
+      # Executa o screen no modo de reanexar - O script shell pausa aqui
+      screen -r "$SESSION_NAME"
+      # Após desanexar do screen, o script shell continua daqui
+      echo "Desanexado da sessão '$SESSION_NAME'."
+    else
+      echo "Sensor não está rodando. Nada para visualizar."
     fi
     ;;
   *)
-    echo "Uso: $0 {start|stop|restart|status|log}"
-    exit 1
+    # Nenhuma ação válida foi fornecida OU nenhum argumento foi dado
+    # A função show_usage será chamada no final de qualquer forma
     ;;
 esac
+
+# Mostra o menu de uso sempre, exceto se um erro fatal ocorreu antes
+show_usage
 
 exit 0
