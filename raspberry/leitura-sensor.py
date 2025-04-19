@@ -62,7 +62,7 @@ def medir_distancia():
     # Fórmula: Distancia (cm) = (Tempo * VelocidadeDoSom) / 2
     # Velocidade do som ~ 34300 cm/s
     distancia = (pulse_duration * 34300) / 2
-    return round(distancia, 2)
+    return round(distancia)
 
 # Função para publicar no mqtt (sem mudanças na lógica principal)
 def publicar(distancia_mediana):
