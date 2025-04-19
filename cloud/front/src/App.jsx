@@ -64,7 +64,7 @@ function App() {
   useEffect(() => {
     console.log("Buscando histórico inicial (24h)...");
     fetchData(
-      "http://localhost:8000/ultimas-24h",
+      "https://caixa-dagua-api.onrender.com/ultimas-24h",
       (data) => {
         const formattedData = data.map(item => ({
           ...item,
@@ -83,7 +83,7 @@ function App() {
     // 1. Busca Inicial da Última Leitura
     console.log("Buscando última leitura inicial...");
     fetchData(
-      "http://localhost:8000/ultima-leitura",
+      "https://caixa-dagua-api.onrender.com/ultima-leitura",
       setUltimaLeitura,
       setIsLoadingUltimaInicial, // Usa o estado de loading inicial
       setErro
@@ -94,7 +94,7 @@ function App() {
     const intervalId = setInterval(() => {
       console.log("Polling: Buscando última leitura...");
       fetchData(
-        "http://localhost:8000/ultima-leitura",
+        "https://caixa-dagua-api.onrender.com/ultima-leitura",
         setUltimaLeitura,
         null, // Não passa o setLoading para não piscar o spinner principal
         setErro,
