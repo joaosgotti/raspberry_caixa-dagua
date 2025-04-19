@@ -25,11 +25,11 @@ client.connect(MQTT_BROKER, MQTT_PORT, 60)
 client.loop_start() # Inicia o loop do MQTT em background
 
 # --- Constantes ---
-NUM_LEITURAS_MEDIANA = 5
-INTERVALO_ENTRE_LEITURAS_MS = 100 # Intervalo em milissegundos entre as leituras para a mediana
-INTERVALO_PUBLICACAO_S = 10 # Intervalo em segundos entre cada publicação da mediana
-DISTANCIA_MIN_VALIDA_CM = 2   # Mínimo razoável para o HC-SR04
-DISTANCIA_MAX_VALIDA_CM = 400 # Máximo razoável para o HC-SR04
+NUM_LEITURAS_MEDIANA = 7 # Número de leituras para calcular a mediana
+INTERVALO_ENTRE_LEITURAS_MS = 1000 # Intervalo em milissegundos entre as leituras para a mediana
+INTERVALO_PUBLICACAO_S = 30 # Intervalo em segundos entre cada publicação da mediana
+DISTANCIA_MIN_VALIDA_CM = 1   # Mínimo razoável para o HC-SR04
+DISTANCIA_MAX_VALIDA_CM = 180 # Máximo razoável para o HC-SR04
 
 # Função para medir a distância (sem mudanças, mas adiciona retorno None para timeout)
 def medir_distancia():
