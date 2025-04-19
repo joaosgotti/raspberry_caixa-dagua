@@ -1,0 +1,72 @@
+Metadata-Version: 2.1
+Name: mqtt-service
+Version: 0.2.5
+Summary: Basic framework for creating MQTT services
+Home-page: https://github.com/weijia/mqtt-service
+Author: Wang Richard
+Author-email: wangweijia2000@sina.com
+License: MIT license
+Keywords: mqtt_service
+Platform: UNKNOWN
+Classifier: Development Status :: 2 - Pre-Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Natural Language :: English
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Requires-Dist: Click (>=6.0)
+
+============
+MQTT Service
+============
+
+
+.. image:: https://img.shields.io/pypi/v/mqtt_service.svg
+        :target: https://pypi.python.org/pypi/mqtt_service
+
+.. image:: https://img.shields.io/travis/weijia/mqtt_service.svg
+        :target: https://travis-ci.org/weijia/mqtt_service
+
+.. image:: https://readthedocs.org/projects/mqtt-service/badge/?version=latest
+        :target: https://mqtt-service.readthedocs.io/en/latest/?badge=latest
+        :alt: Documentation Status
+
+
+
+
+Basic framework for creating MQTT services
+
+
+* Free software: MIT license
+* Documentation: https://mqtt-service.readthedocs.io.
+
+
+Features
+--------
+
+* TODO
+
+Credits
+-------
+
+This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypackage`_ project template.
+
+.. _Cookiecutter: https://github.com/audreyr/cookiecutter
+.. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
+
+
+=======
+History
+=======
+
+0.1.0 (2019-07-17)
+------------------
+
+* First release on PyPI.
+
+
