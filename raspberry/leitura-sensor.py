@@ -107,7 +107,7 @@ def iniciar_medicoes_com_mediana():
             mediana = statistics.median(leituras)
             print(f"Leituras válidas: {leituras}")
             print(f"Mediana calculada: {mediana:.2f} cm")
-            publicar(round(mediana, 2)) # Publica a mediana arredondada
+            publicar(round(mediana)) # Publica a mediana arredondada
         else:
             print(f"Não há leituras válidas suficientes ({len(leituras)}) para calcular a mediana. Pulando publicação.")
 
