@@ -1,8 +1,3 @@
-# Ignorar o diretório do ambiente virtual
-venv-rasp/
-# ou, se o nome do seu ambiente virtual for diferente, como .venv
-.venv-rasp/
-
 # Ignorar arquivos de log
 *.log
 
