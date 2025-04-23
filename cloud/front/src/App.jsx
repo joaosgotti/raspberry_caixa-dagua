@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+// Importa apenas os componentes necessários do Recharts
 import {
   LineChart,
   Line,
@@ -11,295 +12,213 @@ import {
 } from "recharts";
 
 // --- Constantes de Configuração ---
-// Define a URL base da API para facilitar a modificação futura
-const API_BASE_URL = "https://projeto-caixa-dagua-api.onrender.com"; 
-// Define o intervalo de polling para a última leitura em milissegundos
+// URL base da API. Mude para a sua URL no Render ou local, se necessário.
+const API_BASE_URL = "https://projeto-caixa-dagua-api.onrender.com"; // Altere este URL!
+// Intervalo em milissegundos para buscar a última leitura novamente
 const POLLING_INTERVAL_MS = 15000; // 15 segundos
 
-// --- Componente LoadingSpinner (Mantido pela clareza) ---
-// Componente simples para mostrar um indicador de carregamento
+// --- Componente de Loading Minimalista ---
+// Apenas texto ou um spinner CSS simples
 const LoadingSpinner = () => (
-  <div className="loading-spinner"> {/* Classes simplificadas */}
-    <div className="spinner-animation"></div> {/* Classes simplificadas */}
-    <p>Calma lá, estou carregando...</p> {/* Texto mantido */}
+  <div className="loading">
+    <p>Carregando...</p>
   </div>
 );
 
-// --- Componente Principal da Aplicação (simplificado) ---
+// --- Componente Principal (Simplificado) ---
 function App() {
-  // --- Estados do Componente ---
-  // Estado para armazenar a leitura mais recente
+  // --- Estados ---
   const [ultimaLeitura, setUltimaLeitura] = useState(null);
-  // Estado para armazenar o histórico de leituras (últimas 24h)
   const [leituras24h, setLeituras24h] = useState([]);
-  // Estado para armazenar mensagens de erro
   const [erro, setErro] = useState(null);
-  // Estados de loading separados para as cargas INICIAIS (para não sumir o gráfico/última leitura durante o polling)
+  // Estados de loading para as cargas iniciais
   const [isLoadingUltimaInicial, setIsLoadingUltimaInicial] = useState(true);
   const [isLoading24hInicial, setIsLoading24hInicial] = useState(true);
 
-  // --- Função Auxiliar para Buscar Dados ---
-  // Função assíncrona para centralizar a lógica de busca de dados da API.
+  // --- Função para Buscar Dados ---
+  // Função auxiliar para chamar a API, tratar resposta e erros.
   const fetchData = async (url, setData, setLoading, setError, isPolling = false) => {
-    // Define o estado de loading para TRUE APENAS se não for um polling e o setter de loading for fornecido
+    // Ativa loading apenas para cargas iniciais (se setLoading for fornecido)
     if (!isPolling && setLoading) {
       setLoading(true);
     }
-    // Nota: Não limpamos 'erro' globalmente aqui, um fetch bem-sucedido específico fará isso.
+    // Limpa erro específico desta busca (o erro global será sobrescrito se falhar)
+    // setError(null); // Remover esta linha, o catch já setta o erro global
 
     try {
-      // Realiza a chamada HTTP GET para a URL fornecida
       const res = await fetch(url);
-      // Verifica se a resposta HTTP foi bem-sucedida (status 2xx)
       if (!res.ok) {
-        // Se não foi sucesso, lança um erro com status e texto da resposta
-        throw new Error(`Erro ${res.status}: ${res.statusText || 'Falha ao buscar dados'}`);
+        throw new Error(`Erro HTTP ${res.status}: ${res.statusText || 'Falha na resposta'}`);
       }
-      // Converte a resposta HTTP para JSON
       const data = await res.json();
-      // Atualiza o estado dos dados com os dados recebidos
       setData(data);
-      // Limpa o estado de erro global se a busca foi bem-sucedida
+      // Limpa o erro global se esta busca for bem-sucedida
       setError(null);
     } catch (err) {
-      // Captura e loga qualquer erro durante a busca
-      console.error(`Erro ao buscar dados de ${url}:`, err);
-      // Define o estado de erro global com a mensagem do erro
-      setError(err.message);
+      console.error(`Erro ao buscar ${url}:`, err);
+      // Define o erro global se ocorrer qualquer falha
+      setError(`Falha ao buscar dados: ${err.message}`);
     } finally {
-      // Define o estado de loading para FALSE APENAS se não for um polling e o setter de loading for fornecido
+      // Desativa loading apenas para cargas iniciais (se setLoading for fornecido)
       if (!isPolling && setLoading) {
         setLoading(false);
       }
     }
   };
 
-  // ---- Efeito para Carga Inicial do Histórico (Últimas 24h) ----
-  // Executa UMA VEZ após a renderização inicial do componente ([])
+  // --- Efeito para Carga Inicial do Histórico (24h) ---
+  // Busca o histórico UMA VEZ ao montar o componente.
   useEffect(() => {
     console.log("Buscando histórico inicial (24h)...");
-
-    // Chama a função fetchData para buscar o histórico
     fetchData(
-      // CORRIGIDO: Usa a constante API_BASE_URL e o endpoint correto /leituras
-      // Adiciona o parâmetro de query para buscar as últimas 24 horas
-      `${API_BASE_URL}/leituras?periodo_horas=24`,
+      `${API_BASE_URL}/leituras?periodo_horas=24`, // Endpoint corrigido para 24h
       (data) => {
-        // Transforma os dados recebidos antes de salvar no estado:
+        // Mapeia e formata os dados para o gráfico
         const formattedData = data
           .map(item => ({
             ...item,
-            // CORRIGIDO: Usa item.created_on que é o nome da coluna no DB e API
+            
             distancia: typeof item.distancia === 'number' ? item.distancia : null,
-            // Converte o timestamp (string ISO 8601 de 'created_on') para um timestamp numérico (milissegundos)
-            timestamp: new Date(item.created_on).getTime() // Usa created_on aqui
+            created_on: new Date(item.created_on).getTime() 
           }))
-          // Ordena os dados por timestamp ascendente para o gráfico
-          .sort((a, b) => a.timestamp - b.timestamp);
+          .sort((a, b) => a.created_on - b.created_on); // Ordena por tempo
 
-        setLeituras24h(formattedData); // Atualiza o estado do histórico
+        setLeituras24h(formattedData); // Salva no estado
       },
-      setIsLoading24hInicial, // Setter para o estado de loading inicial do histórico
-      setErro // Setter para o estado de erro global
+      setIsLoading24hInicial, // Atualiza loading inicial deste bloco
+      setErro // Seta erro global
     );
-  }, []); // Array de dependências vazio: executa apenas na montagem
+  }, []); // Array vazio = executa apenas na montagem
 
-  // ---- Efeito para Carga Inicial E Polling da Última Leitura ----
-  // Executa UMA VEZ após a renderização inicial do componente ([])
+  // --- Efeito para Carga Inicial da Última Leitura E Polling ---
+  // Busca a última leitura inicialmente e configura o polling.
   useEffect(() => {
-    // 1. Busca Inicial da Última Leitura
+    // Busca inicial da última leitura
     console.log("Buscando última leitura inicial...");
     fetchData(
-      // CORRIGIDO: Usa a constante API_BASE_URL e o endpoint correto /leitura/ultima
-      // REMOVIDO: O parâmetro 'limite=3' que não é esperado por este endpoint da API
-      `${API_BASE_URL}/leitura/ultima`,
-      setUltimaLeitura, // Setter para o estado da última leitura
-      setIsLoadingUltimaInicial, // Setter para o estado de loading inicial da última leitura
-      setErro // Setter para o estado de erro global
+      `${API_BASE_URL}/leitura/ultima`, // Endpoint corrigido para última leitura
+      setUltimaLeitura, // Salva no estado
+      setIsLoadingUltimaInicial, // Atualiza loading inicial deste bloco
+      setErro // Seta erro global
     );
 
-    // 2. Configura o Polling para buscar a última leitura repetidamente
+    // Configura o intervalo de polling
     console.log(`Configurando polling a cada ${POLLING_INTERVAL_MS / 1000} segundos...`);
     const intervalId = setInterval(() => {
       console.log("Polling: Buscando última leitura...");
       fetchData(
-        // CORRIGIDO: Usa o endpoint correto para o polling
-        `${API_BASE_URL}/leitura/ultima`,
-        setUltimaLeitura, // Setter para o estado da última leitura
-        null, // Não passa o setter de loading aqui, para não mostrar o spinner durante o polling
-        setErro, // Setter para o estado de erro global
-        true // Flag para indicar que é uma chamada de polling (usada na função fetchData)
+        `${API_BASE_URL}/leitura/ultima`, // Endpoint para polling
+        setUltimaLeitura,
+        null, // Não atualiza loading durante polling
+        setErro,
+        true // Indica que é polling
       );
-    }, POLLING_INTERVAL_MS); // Intervalo definido na constante
+    }, POLLING_INTERVAL_MS);
 
-    // 3. Função de Limpeza: Executada quando o componente for desmontado
-    // Essencial para limpar o intervalo e evitar vazamento de memória
+    // Função de limpeza: executada ao desmontar o componente
     return () => {
       console.log("Limpando intervalo de polling.");
-      clearInterval(intervalId); // Para o polling
+      clearInterval(intervalId); // Interrompe o polling
     };
 
-  }, []); // Array de dependências vazio: executa apenas na montagem
+  }, []); // Array vazio = configura apenas na montagem
 
-  // --- Funções de Formatação de Data/Hora ---
-  // Funções para formatar os timestamps para exibição no gráfico e na interface.
-  // Ajustadas para o fuso horário de Recife (America/Recife).
-
-  // Formata o valor do eixo X do gráfico (hora:minuto)
-  const formatXAxis = (timestamp) => {
-     if (!timestamp) return ''; // Retorna string vazia para timestamps nulos/inválidos
+  // --- Funções de Formatação de Data/Hora (Mantidas) ---
+  // Formatam created_on para exibição, ajustando para fuso horário de Recife.
+  const formatXAxis = (created_on) => {
+     if (!created_on) return '';
      try {
-        return new Date(timestamp).toLocaleTimeString('pt-BR', {
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'America/Recife'
-        });
-     } catch (e) {
-        console.error("Erro ao formatar timestamp para XAxis:", timestamp, e);
-        return 'Inválido';
-     }
+        return new Date(created_on).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Recife' });
+     } catch (e) { return 'Inválido'; }
   };
 
-  // Formata o rótulo do Tooltip do gráfico (data e hora completa)
-  const formatTooltipLabel = (timestamp) => {
-    if (!timestamp) return 'Data Indisponível';
+  const formatTooltipLabel = (created_on) => {
+    if (!created_on) return 'Data Indisponível';
     try {
-      return new Date(timestamp).toLocaleString('pt-BR', {
-        dateStyle: 'short', // ex: 23/04/2025
-        timeStyle: 'medium', // ex: 14:30:00
-        timeZone: 'America/Recife'
-      });
-    } catch (e) {
-       console.error("Erro ao formatar timestamp para Tooltip:", timestamp, e);
-       return 'Data Inválida';
-    }
+      return new Date(created_on).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'America/Recife' });
+    } catch (e) { return 'Data Inválida'; }
   };
 
-  // Formata o timestamp da Última Leitura para exibição no card
-  const formatUltimaLeituraTimestamp = (timestamp) => {
-    // A API pode retornar um objeto vazio {} se não houver leituras,
-    // então 'timestamp' pode ser undefined ou null.
-    if (!timestamp) return 'Indisponível';
+  const formatUltimaLeituraCreatedOn = (created_on) => {
+    if (!created_on) return 'Indisponível';
     try {
-      // A API retorna o timestamp como string ISO 8601 na chave 'created_on'
-      // Criamos um objeto Date a partir desta string e formatamos.
-      // CORRIGIDO: Acessa created_on do objeto ultimaLeitura se ele existir
-      // const date = new Date(ultimaLeitura.created_on); // Não, a função recebe o valor já extraído
-      const date = new Date(timestamp);
-       // Verifica se a data é válida
-      if (isNaN(date.getTime())) {
-        throw new Error("Data inválida após parse.");
-      }
-      return date.toLocaleString('pt-BR', {
-        dateStyle: 'full',   // ex: terça-feira, 23 de abril de 2025
-        timeStyle: 'medium', // ex: 14:30:00
-        timeZone: 'America/Recife'
-      });
+      // Usa o created_on recebido (que será ultimaLeitura.created_on)
+      const date = new Date(created_on);
+      if (isNaN(date.getTime())) throw new Error("Data inválida.");
+      return date.toLocaleString('pt-BR', { dateStyle: 'full', timeStyle: 'medium', timeZone: 'America/Recife' });
     } catch (e) {
-      console.error("Erro ao formatar timestamp da Última Leitura:", timestamp, e);
+      console.error("Erro ao formatar created_on:", created_on, e);
       return 'Data inválida';
     }
   }
 
-  // --- Renderização da Interface ---
+  // --- Renderização (HTML/JSX Simplificado) ---
   return (
-    // Container principal (classes simplificadas)
-    <div className="app-container">
-      {/* Título e Subtítulo (classes simplificadas, mantendo a estrutura) */}
-      <h1 className="app-title">
-        Monitoramento da Caixa d'Água
-      </h1>
-      <p className="app-subtitle">
-        مراقبة خزان المياه {/* Subtítulo em árabe mantido */}
-      </p>
+    <div className="container"> {/* Classe CSS simples */}
+      <h1 className="title">Monitoramento da Caixa d'Água</h1> {/* Classe CSS simples */}
+      <p className="subtitle">مراقبة خزان المياه</p> {/* Classe CSS simples */}
 
-      {/* Mensagem de Erro (classes simplificadas) */}
-      {erro && (
-        <div className="error-message">
-          <strong>Ocorreu um erro:</strong> <span>{erro}</span>
-        </div>
-      )}
+      {/* Exibe mensagem de erro se houver */}
+      {erro && <div className="error-message">{erro}</div>} {/* Classe CSS simples */}
 
-      {/* Layout principal em Grid (classes simplificadas) */}
-      <div className="main-grid-layout">
-        {/* Coluna Esquerda (classes simplificadas) */}
-        <div className="left-column">
-          {/* Card da Última Leitura (classes simplificadas) */}
-          <div className="card">
-            <h2 className="card-title">
-              Última Leitura
-            </h2>
-            {/* Lógica de exibição condicional: Spinner, Dados, ou Mensagem */}
-            {isLoadingUltimaInicial ? (
-              // Mostra o spinner APENAS na carga inicial deste bloco
-              <LoadingSpinner />
-            ) : ultimaLeitura && typeof ultimaLeitura.distancia === 'number' ? (
-               // Se não está carregando e há dados de última leitura com distância numérica
-              <div className="data-display">
-                <p><span>Nível:</span>{' '}{`${ultimaLeitura.distancia.toFixed(1)} cm`}</p>
-                {/* CORRIGIDO: Passa ultimaLeitura.created_on para a função de formatação */}
-                <p><span>Data:</span>{' '}{formatUltimaLeituraTimestamp(ultimaLeitura.created_on)}</p>
-              </div>
-             ) : !erro ? (
-                // Se não está carregando, não há erro, e não há dados válidos
-               <p>Nenhuma leitura disponível.</p>
-             ) : (
-                // Se há erro, não mostra mensagem de "nenhuma leitura", o erro global já aparece.
-                // Poderia ser null ou <></>
-                null
-             )}
-          </div>
+      {/* Layout básico flexível ou em blocos */}
+      <div className="content-area"> {/* Classe CSS simples */}
 
-          {/* Bloco de Perfil (classes simplificadas) */}
-          <div className="profile-block">
-             {/* Imagem mantida, classes simplificadas */}
-             {/* Nota: a imagem /jvsv.jpg precisa existir na pasta 'public' do seu projeto Frontend */}
-             <img
-               src="/jvsv.jpg"
-               alt="Foto de João Vitor"
-               className="profile-image"
-             />
-             <div className="profile-text">
-               <p>Desenvolvido por:</p>
-               <p>João Vítor Sgotti Veiga</p>
-             </div>
-          </div>
-        </div>
-
-        {/* Coluna Direita: Gráfico (classes simplificadas) */}
-        <div className="right-column card"> {/* Adicionado classe card para estilo */}
-          <h2 className="card-title">
-            Histórico (Últimas 24h)
-          </h2>
-          {/* Lógica de exibição condicional: Spinner, Gráfico, ou Mensagem */}
-          {isLoading24hInicial ? (
-            // Mostra o spinner APENAS na carga inicial deste bloco
-            <div className="chart-loading-container"><LoadingSpinner /></div>
-          ) : leituras24h.length > 0 ? (
-             // Se não está carregando e há dados no histórico
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={leituras24h} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                {/* Grid, Eixos, Tooltip, Legenda (classes/estilos recharts mantidos) */}
-                <CartesianGrid strokeDasharray="3 3" stroke="#ccc" /> {/* Stroke simplificado */}
-                <XAxis dataKey="timestamp" tickFormatter={formatXAxis} stroke="#888" /> {/* Stroke simplificado */}
-                <YAxis stroke="#888" domain={['dataMin - 5', 'dataMax + 5']} /> {/* Stroke simplificado */}
-                {/* Tooltip e Legend styles mantidos para funcionalidade e legibilidade */}
-                <Tooltip labelFormatter={formatTooltipLabel} contentStyle={{ backgroundColor: '#fff', borderColor: '#ccc' }} itemStyle={{ color: '#8884d8' }} labelStyle={{ fontWeight: 'bold' }} formatter={(value) => [`${typeof value === 'number' ? value.toFixed(1) : '?'} cm`, 'Distância']} />
-                <Legend />
-                {/* Linha do gráfico (stroke, dot styles mantidos para clareza visual) */}
-                <Line type="monotone" dataKey="distancia" name="Distância (cm)" stroke="#8884d8" strokeWidth={2} dot={false} activeDot={{ r: 6, fill: '#8884d8', stroke: '#fff', strokeWidth: 2 }} />
-              </LineChart>
-            </ResponsiveContainer>
+        {/* Seção Última Leitura */}
+        <div className="card"> {/* Classe CSS simples */}
+          <h2 className="card-title">Última Leitura</h2> {/* Classe CSS simples */}
+          {isLoadingUltimaInicial ? (
+            <LoadingSpinner />
+          ) : ultimaLeitura && typeof ultimaLeitura.distancia === 'number' ? (
+             // Se não está carregando e há dados de última leitura com distância numérica
+            <div className="data-item"> {/* Classe CSS simples */}
+              <p>Nível: {ultimaLeitura.distancia.toFixed(1)} cm</p>
+              {/* Passa ultimaLeitura.created_on para a função de formatação */}
+              <p>Data: {formatUltimaLeituraCreatedOn(ultimaLeitura.created_on)}</p>
+            </div>
           ) : !erro ? (
-             // Se não está carregando, não há erro, e o histórico está vazio
-             <div className="chart-empty-message-container"> {/* Classes simplificadas, CORRIGIDO o fechamento da div */}
-                <p>Nenhum histórico disponível para as últimas 24h.</p>
-             </div>
-          ) : (
-             // Se há erro, não mostra mensagem de "nenhum histórico", o erro global já aparece.
-             null
-          )}
+            <p>Nenhuma leitura disponível.</p>
+          ) : null}
         </div>
+
+        {/* Seção Histórico (Gráfico) */}
+        <div className="card chart-card"> {/* Classes CSS simples */}
+           <h2 className="card-title">Histórico (Últimas 24h)</h2> {/* Classe CSS simples */}
+           {isLoading24hInicial ? (
+             // Mostra spinner na carga inicial do histórico
+             <div className="chart-loading-container"><LoadingSpinner /></div>
+           ) : leituras24h.length > 0 ? (
+             // Se não está carregando e há dados no histórico, mostra o gráfico
+             <ResponsiveContainer width="100%" height={300}>
+               <LineChart data={leituras24h} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                 <CartesianGrid strokeDasharray="3 3" stroke="#eee" /> {/* Stroke simplificado */}
+                 <XAxis dataKey="created_on" tickFormatter={formatXAxis} stroke="#888" /> {/* Stroke simplificado */}
+                 <YAxis stroke="#888" domain={['dataMin - 5', 'dataMax + 5']} /> {/* Stroke simplificado */}
+                 {/* Tooltip e Legend mantidos pela funcionalidade */}
+                 <Tooltip labelFormatter={formatTooltipLabel} />
+                 <Legend />
+                 {/* Linha do gráfico */}
+                 <Line type="monotone" dataKey="distancia" name="Distância (cm)" stroke="#8884d8" strokeWidth={2} dot={false} />
+               </LineChart>
+             </ResponsiveContainer>
+           ) : !erro ? (
+             // Se não está carregando, não há erro e o histórico está vazio
+             <div className="chart-empty-message-container">
+               <p>Nenhum histórico disponível para as últimas 24h.</p>
+             </div>
+           ) : null}
+        </div>
+
+        {/* Bloco de Perfil (Opcional, mantido simplificado) */}
+        <div className="profile-block"> {/* Classe CSS simples */}
+          {/* Nota: a imagem /jvsv.jpg precisa estar na pasta 'public' */}
+          <img src="/jvsv.jpg" alt="Foto de João Vitor" className="profile-image" /> {/* Classe CSS simples */}
+          <div className="profile-text"> {/* Classe CSS simples */}
+            <p>Desenvolvido por:</p>
+            <p>João Vítor Sgotti Veiga</p>
+          </div>
+        </div>
+
       </div>
     </div>
   );
