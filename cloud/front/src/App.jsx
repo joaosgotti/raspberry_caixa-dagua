@@ -274,7 +274,7 @@ function App() {
           {/* Lógica de exibição condicional: Spinner, Gráfico, ou Mensagem */}
           {isLoading24hInicial ? (
             // Mostra o spinner APENAS na carga inicial deste bloco
-            <div className="chart-loading-container"><LoadingSpinner /></div> {/* Classes simplificadas */}
+            <div className="chart-loading-container"><LoadingSpinner /></div>
           ) : leituras24h.length > 0 ? (
              // Se não está carregando e há dados no histórico
             <ResponsiveContainer width="100%" height={300}>
