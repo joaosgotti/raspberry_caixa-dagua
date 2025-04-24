@@ -1,0 +1,76 @@
+/* src/App.css */
+
+/* Importa as diretivas do Tailwind no arquivo CSS principal (geralmente index.css). */
+/* É CRUCIAL que seu index.css contenha APENAS as 3 linhas @tailwind. */
+/* Se você importar index.css aqui, certifique-se de que ele SÓ tem as diretivas. */
+/* A abordagem padrão do Vite é importar index.css em main.jsx/index.js. */
+/* Se index.js/main.js já importa index.css, você PODE remover a linha de import */
+/* "./index.css" do App.jsx e só importar App.css lá, ou manter ambos se a ordem funcionar. */
+
+/* Exemplo de importação do index.css se necessário e se index.js/main.js NÃO importar: */
+/* @import "./index.css"; */
+
+
+/* ------------------------------------ */
+/* Estilos Customizados (NÃO-Tailwind)  */
+/* ------------------------------------ */
+
+/* Container para mensagens de loading/vazio (usado no LoadingSpinner e nos contêineres de mensagem do gráfico) */
+/* Note que muitas propriedades de layout (display, flex-direction, justify-content, align-items) */
+/* estão definidas diretamente no JSX com classes Tailwind (flex, flex-col, items-center, justify-center). */
+/* Estas regras aqui complementam com espaçamento, cor de texto, etc., se não estiverem no JSX. */
+.loading,
+.chart-loading-container,
+.chart-empty-message-container {
+  /* Classes Tailwind no JSX cuidam da maioria do layout. Estas são apenas complementares. */
+  /* Ex: text-slate-400 no JSX define a cor. */
+  text-align: center; /* Garante que o texto esteja centralizado */
+  padding: 20px 0; /* Espaçamento vertical */
+  font-size: 0.9em; /* Tamanho da fonte */
+  /* min-height pode ser definida no container pai no JSX, ex: h-[300px] ou min-h-[200px] */
+}
+
+/* Estilo para o elemento do spinner de carregamento (o div com a classe "spinner" no JSX) */
+.spinner {
+  border: 3px solid rgba(148, 163, 184, 0.2); /* Borda cinza claro transparente (similar ao slate-400 com opacidade) */
+  border-top: 3px solid #60a5fa; /* Parte superior azul (similar ao blue-400/500) para a animação */
+  border-radius: 50%; /* Torna o elemento circular */
+  width: 24px; /* Define o tamanho do spinner */
+  height: 24px;
+  animation: spin 1s linear infinite; /* Aplica a animação de giro */
+  margin-bottom: 5px; /* Adiciona um pequeno espaço abaixo do spinner */
+  flex-shrink: 0; /* Garante que não encolha em flex containers */
+}
+
+/* Definição da animação de giro */
+@keyframes spin {
+  0% { transform: rotate(0deg); } /* Começa em 0 graus */
+  100% { transform: rotate(360deg); } /* Termina em 360 graus (uma volta completa) */
+}
+
+
+/* --- Estilos Específicos do Gráfico (Recharts) --- */
+/* Estas regras são usadas para estilizar elementos gerados pelo Recharts que não têm classes fáceis de estilizar com Tailwind */
+/* ou onde é mais simples sobrescrever via CSS tradicional. */
+
+/* Exemplo: Estilo para os textos nos eixos do gráfico */
+/* fill e font-size estão definidos nas props tick={{...}} no JSX, mas se precisar sobrescrever globalmente: */
+/* .recharts-cartesian-axis-tick tspan { fill: #94a3b8; font-size: 12px; } */
+
+/* Exemplo: Estilo para a legenda do gráfico */
+/* color e padding-top estão definidos nas props wrapperStyle/itemStyle no JSX, mas se precisar sobrescrever: */
+/* .recharts-legend-wrapper { padding-top: 20px; } */
+/* .recharts-legend-item text { fill: #cbd5e1; } */
+
+/* Estilo para o Tooltip que aparece ao passar o mouse no gráfico */
+/* Background, border, shadow, etc., estão definidos nas props contentStyle no JSX */
+/* .recharts-tooltip-wrapper { ... } */
+/* .recharts-tooltip-label { ... } */
+/* .recharts-tooltip-item { ... } */
+
+/* Garante que o container responsivo do Recharts se ajuste corretamente em layouts flex/grid */
+/* min-width: 0 é importante para que o item flex/grid possa encolher */
+.chart-section .recharts-responsive-container {
+   min-width: 0; /* Permite que o flex/grid item (o container do gráfico) encolha */
+   /* A altura é definida na prop height={300} no JSX */
+}
