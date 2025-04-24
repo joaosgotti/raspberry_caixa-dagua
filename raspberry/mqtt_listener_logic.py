@@ -63,6 +63,7 @@ class MQTTListener:
         """Callback de Log para Debug Detalhado Paho."""
         # Filtra logs muito verbosos (INFO, DEBUG) se necessário
         # levels: MQTT_LOG_INFO, MQTT_LOG_NOTICE, MQTT_LOG_WARNING, MQTT_LOG_ERR, MQTT_LOG_DEBUG
+        print(f"[MQTT PAHO LOG | Lvl:{level}] {buf}")
         if level == mqtt.MQTT_LOG_WARNING or level == mqtt.MQTT_LOG_ERR:
              print(f"[MQTT PAHO LOG | Lvl:{level} | WARN/ERR] {buf}")
         elif level == mqtt.MQTT_LOG_DEBUG:
