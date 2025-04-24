@@ -1,0 +1,15 @@
+🔼 git push
+Função: Envia commits do seu repositório local para o repositório remoto (ex: GitHub, GitLab).
+Quando usar: Quando você quer compartilhar suas alterações com outras pessoas ou salvar seu progresso online.
+
+git push origin main
+
+Isso manda suas alterações da branch main local para a branch main no repositório remoto chamado origin.
+
+🔽 git pull
+Função: Baixa as alterações do repositório remoto e atualiza seu repositório local.
+Quando usar: Quando você quer garantir que está trabalhando com a versão mais atual do código, especialmente se outras pessoas também estão contribuindo.
+
+git pull origin main
+
+Isso traz as mudanças da branch main do repositório remoto e as aplica à sua branch local.
