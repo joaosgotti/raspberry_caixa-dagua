@@ -29,7 +29,7 @@ class MQTTListener:
     """
     Escuta mensagens em um tópico MQTT, processa os dados recebidos (JSON esperado)
     e opcionalmente os persiste usando um DatabaseHandler.
-    Inclui logging detalhado para diagnóstico de conexão.
+    Inclui logging detalhado e lógica de re-inscrição no tópico após reconexão.
     """
 
     # Modificado para aceitar db_handler opcional
@@ -61,63 +61,58 @@ class MQTTListener:
 
     def _on_log(self, client, userdata, level, buf):
         """Callback de Log para Debug Detalhado Paho."""
-        # Filtra logs muito verbosos (INFO, DEBUG) se necessário
-        # levels: MQTT_LOG_INFO, MQTT_LOG_NOTICE, MQTT_LOG_WARNING, MQTT_LOG_ERR, MQTT_LOG_DEBUG
+        # Imprime TODOS os níveis agora para diagnóstico
         print(f"[MQTT PAHO LOG | Lvl:{level}] {buf}")
-        if level == mqtt.MQTT_LOG_WARNING or level == mqtt.MQTT_LOG_ERR:
-             print(f"[MQTT PAHO LOG | Lvl:{level} | WARN/ERR] {buf}")
-        elif level == mqtt.MQTT_LOG_DEBUG:
-             # Descomente a linha abaixo para ver ABSOLUTAMENTE TUDO (muito verboso!)
-             # print(f"[MQTT PAHO LOG | Lvl:{level} | DEBUG] {buf}")
-             pass
-        else:
-             # Imprime INFO e NOTICE
-             print(f"[MQTT PAHO LOG | Lvl:{level} | INFO/NOTICE] {buf}")
 
 
     def _on_connect(self, client, userdata, flags, rc, properties=None):
         """Callback executado quando a conexão MQTT é estabelecida ou falha."""
-        # DEBUG: Imprime o código de retorno sempre
         print(f"[MQTT Listener] Callback _on_connect chamado com código de retorno (rc): {rc}")
 
         if rc == 0:
             self.is_connected = True
             print(f"[MQTT Listener] CONECTADO com sucesso ao Broker MQTT!")
+
+            # --- LÓGICA DE RE-INSCRIÇÃO ---
+            # Sempre tenta (re)inscrever após uma conexão bem-sucedida
             try:
-                print(f"[MQTT Listener] Inscrevendo-se no tópico: '{config.MQTT_TOPIC}' com QoS 1...")
-                result, mid = client.subscribe(config.MQTT_TOPIC, qos=1)
+                topic = config.MQTT_TOPIC
+                qos = 1
+                print(f"[MQTT Listener] Tentando (RE)INSCREVER no tópico: '{topic}' com QoS {qos}...")
+                # Faça a inscrição aqui
+                result, mid = client.subscribe(topic, qos=qos)
                 if result == mqtt.MQTT_ERR_SUCCESS:
-                    print(f"[MQTT Listener] >> Inscrito com sucesso (MID: {mid})")
+                    print(f"[MQTT Listener] >> (Re)Inscrito com sucesso (MID: {mid})")
                 else:
-                    # Usar função da Paho para descrever o erro de subscribe
-                    print(f"[MQTT Listener] ERRO ao inscrever no tópico! Código Paho: {result} - {mqtt.error_string(result)}")
+                    print(f"[MQTT Listener] ERRO ao (re)inscrever! Código Paho: {result} - {mqtt.error_string(result)}")
             except Exception as e:
-                print(f"[MQTT Listener] ERRO EXCEPCIONAL durante a inscrição no tópico '{config.MQTT_TOPIC}': {e}")
+                print(f"[MQTT Listener] ERRO EXCEPCIONAL durante a (re)inscrição no tópico '{topic}': {e}")
+            # --- FIM DA LÓGICA DE RE-INSCRIÇÃO ---
+
         else:
+            # A lógica de falha na conexão permanece a mesma
             self.is_connected = False
-            # Imprime o erro específico baseado no código rc usando função da Paho
             error_message = mqtt.connack_string(rc)
             print(f"[MQTT Listener] FALHA NA CONEXÃO com Broker MQTT (Código: {rc}) - {error_message}")
-            print("[MQTT Listener] -> VERIFIQUE: Endereço/Porta do Broker, Credenciais (usuário/senha), Configuração TLS, Rede/Firewall, Status do Broker.")
-            # Considerar parar tentativas se for erro de autenticação claro
+            print("[MQTT Listener] -> VERIFIQUE: Endereço/Porta, Credenciais, TLS, Rede/Firewall, Status do Broker.")
             if rc in [mqtt.CONNACK_REFUSED_BAD_USERNAME_PASSWORD, mqtt.CONNACK_REFUSED_NOT_AUTHORIZED]:
-                 print("[MQTT Listener] *** Erro crítico de autenticação/autorização. Verifique as credenciais IMEDIATAMENTE. ***")
+                 print("[MQTT Listener] *** Erro crítico de autenticação/autorização. ***")
 
 
     def _on_disconnect(self, client, userdata, rc, properties=None):
         """Callback executado quando a conexão MQTT é perdida."""
-         # DEBUG: Imprime o código de retorno sempre
         print(f"[MQTT Listener] Callback _on_disconnect chamado com código de retorno (rc): {rc}")
         was_connected = self.is_connected # Guarda o estado anterior
         self.is_connected = False
         if rc == 0:
              print("[MQTT Listener] Desconexão limpa iniciada pelo cliente ou broker.")
         else:
-            # Tenta obter a descrição do erro
-            reason = mqtt.error_string(rc) #if rc in mqtt.error_string_map else f"Código de erro Paho desconhecido: {rc}"
+            # Usar diretamente mqtt.error_string(rc)
+            reason = mqtt.error_string(rc)
             print(f"[MQTT Listener] DESCONECTADO INESPERADAMENTE do MQTT (Código: {rc}). Razão: {reason}")
             if was_connected: # Só avisa sobre reconexão se estava conectado antes
                 print("[MQTT Listener] -> Verifique a rede, o status do broker. Tentativa de reconexão automática (se aplicável)...")
+
 
     def _on_message(self, client, userdata, message: mqtt.MQTTMessage):
         """Callback executado quando uma mensagem MQTT é recebida."""
@@ -137,13 +132,11 @@ class MQTTListener:
 
             # --- Interação com o Banco de Dados (Condicional) ---
             if self.db_handler:
-                # print("  [MQTT Listener] Tentando interação com o Banco de Dados...") # Log opcional
                 connection = None
                 try:
                     connection = self.db_handler.connect()
                     if connection:
                         success = self.db_handler.insert_reading(connection, distancia, created_on_dt)
-                        # db_handler já imprime sucesso ou falha na inserção
                         if not success:
                              print("  [MQTT Listener] Falha ao inserir no DB (ver logs do DB Handler).")
                     else:
@@ -153,8 +146,6 @@ class MQTTListener:
                 finally:
                     if connection:
                         self.db_handler.close(connection)
-            # else: # Modo teste sem DB, não precisa imprimir nada aqui
-            #     pass
             # --- Fim da Interação com o Banco de Dados ---
         else:
             print(f"  [MQTT Listener] Falha ao processar JSON da mensagem. Payload: {payload_str}")
@@ -166,7 +157,6 @@ class MQTTListener:
         print("[MQTT Listener] Configurando cliente Paho...")
         try:
             # 1. Autenticação
-            # === OPÇÃO 1: Ler do config.py (Normal) ===
             if config.MQTT_USER and config.MQTT_PASSWORD:
                 self.client.username_pw_set(config.MQTT_USER, config.MQTT_PASSWORD)
                 print("[MQTT Listener] Usando Usuário/Senha do config.py.")
@@ -176,19 +166,11 @@ class MQTTListener:
             else:
                 print("[MQTT Listener] Conectando sem usuário/senha MQTT (config não definido).")
 
-            # === OPÇÃO 2: Credenciais Hardcoded (APENAS PARA TESTE, LEMBRE-SE DE REMOVER!) ===
-            # print("[MQTT Listener] ATENÇÃO: Usando credenciais HARDCODED para teste!")
-            # self.client.username_pw_set("joaosgotti", "sS123412") # <<< DESCOMENTE APENAS PARA TESTAR
-
             # 2. Configuração TLS (se porta for 8883)
             if config.MQTT_PORT == 8883:
                 print("[MQTT Listener] Configurando TLS (porta 8883 detectada)...")
                 self.client.tls_set(tls_version=ssl.PROTOCOL_TLSv1_2)
                 print("[MQTT Listener] TLS v1.2 configurado.")
-
-                # === OPÇÃO 3: Bypass Validação Certificado (INSEGURO - APENAS PARA TESTE!) ===
-                # print("[MQTT Listener] ATENÇÃO: Habilitando tls_insecure_set(True) para teste!")
-                # self.client.tls_insecure_set(True) # DESCOMENTE APENAS PARA TESTAR PROBLEMAS DE CERTIFICADO
             else:
                 print("[MQTT Listener] Conexão sem TLS (porta diferente de 8883).")
 
@@ -229,10 +211,6 @@ class MQTTListener:
             distancia_float = float(distancia)
             created_on_dt = datetime.fromisoformat(created_on_str)
 
-            # Validação opcional de limites
-            # if not (0 < distancia_float < 1000): # Exemplo
-            #     print(f"  [Process] Aviso: Distancia ({distancia_float}) fora do limite esperado.")
-
             return distancia_float, created_on_dt
 
         except json.JSONDecodeError as e:
@@ -257,9 +235,9 @@ class MQTTListener:
         try:
             print(f"[MQTT Listener] Tentando conectar ao Broker: {config.MQTT_BROKER}:{config.MQTT_PORT}...")
             # connect() é assíncrono.
+            # Use o keepalive configurado (180s no último teste, pode voltar para 60s se preferir)
             self.client.connect(config.MQTT_BROKER, config.MQTT_PORT, keepalive=180)
-            print("[MQTT Listener] Comando connect enviado. Aguardando callback _on_connect...")
-            # É importante que o loop de rede seja iniciado depois para processar o CONNACK
+            print(f"[MQTT Listener] Comando connect enviado (keepalive={self.client._keepalive}s). Aguardando callback _on_connect...")
             return True # Indica que a tentativa foi iniciada sem erro imediato
         except ssl.SSLError as e:
              print(f"[MQTT Listener] ERRO SSL ao tentar conectar: {e}")
@@ -275,22 +253,24 @@ class MQTTListener:
 
     def start_listening(self):
         """Inicia o loop de rede principal para escutar mensagens (bloqueante)."""
-        # Verifica se a conexão foi estabelecida antes de bloquear
-        # (Nota: o main_listener.py já faz essa checagem após um sleep)
         if not self.is_connected:
              print("[MQTT Listener] ERRO: Não pode iniciar loop de escuta - conexão não estabelecida.")
              print("[MQTT Listener] Verifique os logs anteriores para o motivo da falha na conexão.")
              return
 
-        print("[MQTT Listener] Iniciando loop de escuta MQTT (bloqueante - use Ctrl+C para sair)...")
+        print("[MQTT Listener] Iniciando loop de escuta MQTT (blocking - use Ctrl+C para sair)...")
         try:
             # loop_forever() processa I/O de rede, callbacks e lida com reconexões (se não for erro fatal)
             self.client.loop_forever()
         except KeyboardInterrupt:
              print("\n[MQTT Listener] KeyboardInterrupt recebido no loop_forever.")
-             # A desconexão será tratada no bloco finally do main_listener.py
         except Exception as e:
+             # Captura exceções que podem ocorrer *dentro* do loop do Paho
+             # como o 'bad char in struct format' que vimos antes
              print(f"[MQTT Listener] ERRO CRÍTICO dentro do loop_forever Paho: {e}")
+             # Adiciona um traceback para ajudar a diagnosticar onde no Paho o erro ocorreu
+             import traceback
+             traceback.print_exc()
              self.disconnect() # Tenta desconectar em caso de erro inesperado no loop
         finally:
             print("[MQTT Listener] Saindo/Terminando loop_forever.")
@@ -298,15 +278,11 @@ class MQTTListener:
     def disconnect(self):
         """Desconecta o cliente MQTT de forma limpa."""
         if self.client:
-            # Verifica se o cliente está conectado antes de tentar desconectar
-            # (A biblioteca Paho pode ter sua própria flag interna)
             print("[MQTT Listener] Solicitando desconexão do cliente MQTT...")
             self.client.disconnect() # Solicita desconexão limpa
-            # self.client.loop_stop() # Necessário se estivesse usando loop_start()
             print("[MQTT Listener] Comando de desconexão enviado.")
         else:
             print("[MQTT Listener] Cliente não inicializado, não há o que desconectar.")
-        # Garante que o estado interno seja atualizado
         self.is_connected = False
 
 # --- Fim da Classe MQTTListener ---
