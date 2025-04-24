@@ -257,7 +257,7 @@ class MQTTListener:
         try:
             print(f"[MQTT Listener] Tentando conectar ao Broker: {config.MQTT_BROKER}:{config.MQTT_PORT}...")
             # connect() é assíncrono.
-            self.client.connect(config.MQTT_BROKER, config.MQTT_PORT, keepalive=60)
+            self.client.connect(config.MQTT_BROKER, config.MQTT_PORT, keepalive=30)
             print("[MQTT Listener] Comando connect enviado. Aguardando callback _on_connect...")
             # É importante que o loop de rede seja iniciado depois para processar o CONNACK
             return True # Indica que a tentativa foi iniciada sem erro imediato
