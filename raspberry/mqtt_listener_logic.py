@@ -113,7 +113,7 @@ class MQTTListener:
              print("[MQTT Listener] Desconexão limpa iniciada pelo cliente ou broker.")
         else:
             # Tenta obter a descrição do erro
-            reason = mqtt.error_string(rc) if rc in mqtt.error_string_map else f"Código de erro Paho desconhecido: {rc}"
+            reason = mqtt.error_string(rc) #if rc in mqtt.error_string_map else f"Código de erro Paho desconhecido: {rc}"
             print(f"[MQTT Listener] DESCONECTADO INESPERADAMENTE do MQTT (Código: {rc}). Razão: {reason}")
             if was_connected: # Só avisa sobre reconexão se estava conectado antes
                 print("[MQTT Listener] -> Verifique a rede, o status do broker. Tentativa de reconexão automática (se aplicável)...")
