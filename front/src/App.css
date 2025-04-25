@@ -1,152 +1,42 @@
 /* src/App.css */
 
-/* Define algumas variáveis CSS para os tons */
-:root {
-  --background-light: #f4f7f6; /* Cinza muito claro para o fundo */
-  --text-dark: #333; /* Cinza escuro para o texto geral */
-  --text-medium: #555; /* Cinza médio para texto secundário/rótulos */
-  --border-color: #dcdcdc; /* Cinza claro para bordas */
-  --container-bg: #fff; /* Fundo branco para os containers */
-  --primary-dark-blue: #1a2e4a; /* Azul escuro principal */
-  --primary-blue-light: #2c3e50; /* Um pouco mais claro, para títulos */
+/* Importa as camadas base do Tailwind CSS */
+/* Inclui resets de CSS e estilos básicos */
+@tailwind base;
+
+/* Importa as camadas de componentes do Tailwind CSS */
+/* Inclui estilos pré-configurados para componentes comuns, se você os usar */
+@tailwind components;
+
+/* Importa as camadas de utilitários do Tailwind CSS */
+/* Inclui a vasta maioria das classes utilitárias do Tailwind (flex, grid, bg-*, p-*, etc.) */
+@tailwind utilities;
+
+/*
+  Qualquer estilo customizado que você não consiga fazer com classes Tailwind pode ser adicionado aqui.
+  Geralmente, você tentará usar classes Tailwind o máximo possível e só recorrerá a CSS customizado
+  para coisas muito específicas.
+
+  Exemplo (se necessário):
+  .alguma-classe-muito-especifica {
+      font-size: 1.2rem;
+      border: 2px dashed #fff;
+  }
+  (Mas muitas dessas regras podem ser feitas com classes Tailwind como max-w-6xl, mx-auto, p-8, text-center)
+*/
+
+/* Estilos básicos para html e body (geralmente o @tailwind base já cobre muito, mas pode adicionar aqui) */
+html, body {
+    margin: 0;
+    padding: 0;
+    /* A cor de fundo e a fonte principal do body estão sendo aplicadas diretamente no div mais externo do App.jsx com classes Tailwind */
 }
 
-body {
-  font-family: sans-serif;
-  margin: 0; /* Remove margem padrão */
-  padding: 20px;
-  background-color: var(--background-light); /* Fundo cinza claro */
-  color: var(--text-dark); /* Texto geral cinza escuro */
-  line-height: 1.6;
-  display: flex; /* Centraliza o conteúdo principal na página */
-  justify-content: center;
-  align-items: flex-start; /* Alinha ao topo */
-  min-height: 100vh;
-}
-
-.app-container {
+/* Estilos para a raiz do seu aplicativo React (geralmente o div com id="root" no index.html) */
+/* Opcional, dependendo de como você quer que o app ocupe a tela */
+/*
+#root {
     width: 100%;
-    max-width: 1000px; /* Aumenta a largura máxima para acomodar duas colunas */
-    background-color: var(--container-bg); /* Fundo branco para a área principal */
-    padding: 30px;
-    border-radius: 8px; /* Bordas arredondadas */
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Sombra suave */
-    text-align: left; /* Alinha texto à esquerda */
-
-    /* --- Layout Flexbox para as colunas --- */
-    display: flex;
-    gap: 30px; /* Espaço entre as colunas */
-    flex-wrap: wrap; /* Permite quebras de linha em telas menores */
+    min-height: 100vh;
 }
-
-.column {
-    /* Estilo base para as colunas */
-    flex-grow: 1; /* Permite que as colunas cresçam */
-    /* Adicionaremos larguras específicas abaixo */
-}
-
-.column.part-1 {
-    flex-basis: 30%; /* Base de 30% da largura */
-    max-width: 30%; /* Garante que não passe de 30% em telas largas */
-    min-width: 250px; /* Largura mínima para não ficar muito estreito */
-}
-
-.column.part-2 {
-    flex-basis: 0; /* Começa com base 0 */
-    flex-grow: 1; /* Cresce para ocupar o espaço restante (2/3) */
-    min-width: 300px; /* Largura mínima para o gráfico */
-}
-
-/* Ajuste para telas menores: colunas empilham */
-@media (max-width: 768px) {
-    .app-container {
-        flex-direction: column; /* Empilha as colunas verticalmente */
-        gap: 20px; /* Espaço entre os elementos empilhados */
-        padding: 20px;
-    }
-
-    .column.part-1,
-    .column.part-2 {
-        flex-basis: auto; /* Largura automática */
-        max-width: 100%; /* Ocupa toda a largura disponível */
-        min-width: auto;
-    }
-}
-
-
-h1 {
-  text-align: center; /* Centraliza o título principal */
-  color: var(--primary-dark-blue); /* Título em azul escuro */
-  margin-bottom: 30px;
-  width: 100%; /* Título ocupa a largura total acima das colunas */
-}
-
-h2 {
-  color: var(--primary-blue-light); /* Subtítulos em azul um pouco mais claro */
-  border-bottom: 1px solid var(--border-color); /* Linha cinza abaixo dos subtítulos */
-  padding-bottom: 5px;
-  margin-top: 0; /* Ajusta margem superior em colunas */
-  margin-bottom: 15px;
-}
-
-.reading-container {
-  border: 1px solid var(--border-color); /* Borda cinza */
-  padding: 15px;
-  margin-bottom: 20px; /* Espaço abaixo da caixa de leitura */
-  border-radius: 5px;
-  background-color: #fdfdfd; /* Fundo quase branco */
-}
-
-.reading-container p {
-    margin: 8px 0; /* Espaçamento entre parágrafos */
-    color: var(--text-dark); /* Cor do texto */
-}
-
-.reading-container strong {
-    color: var(--text-medium); /* Cor para os rótulos */
-    display: inline-block;
-    min-width: 120px; /* Garante um espaço mínimo para os rótulos */
-}
-
-.user-info {
-    margin-top: 30px; /* Espaço acima das informações do usuário */
-    text-align: center; /* Centraliza texto e imagem */
-}
-
-.user-info img {
-    width: 100px; /* Tamanho da foto */
-    height: 100px;
-    border-radius: 50%; /* Foto redonda */
-    object-fit: cover; /* Garante que a imagem preencha o espaço */
-    margin-bottom: 10px;
-    border: 3px solid var(--primary-blue-light); /* Borda na foto */
-}
-
-.user-info p {
-    margin: 5px 0;
-    color: var(--text-dark);
-    font-weight: bold;
-}
-
-
-/* Estilo para o texto de "Aguardando dados..." */
-.loading-text {
-    text-align: center;
-    font-style: italic;
-    color: var(--text-medium);
-}
-
-/* Estilo para a área do gráfico */
-.graph-container {
-    /* Estilos para o container do gráfico */
-    padding: 15px;
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    background-color: #fdfdfd;
-    min-height: 300px; /* Altura mínima para o gráfico */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    color: var(--text-medium);
-}
+*/

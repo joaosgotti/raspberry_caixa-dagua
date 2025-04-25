@@ -1,174 +1,303 @@
 // src/App.jsx
-import { useState, useEffect } from 'react';
-import './App.css'; // Importe o arquivo CSS
+import { useState, useEffect } from "react";
+// Importa componentes necessários do Recharts
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
-// *** IMPORTAR BIBLIOTECA DE GRÁFICOS AQUI ***
-// Exemplo (depois de instalar):
-// import { Line } from 'react-chartjs-2';
-// import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
-// ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+// Importa o arquivo CSS principal (que deve conter as diretivas Tailwind)
+import "./App.css";
 
+// Componente simples de Spinner para indicar carregamento
+const LoadingSpinner = () => (
+  <div className="flex justify-center items-center h-full py-10"> {/* Adicionado py-10 para dar espaço vertical */}
+    {/* Usando classes Tailwind para estilizar o spinner */}
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-400"></div>
+    <p className="ml-3 text-slate-400">Carregando...</p>
+  </div>
+);
+
+// Defina o intervalo de polling em milissegundos (ex: 15 segundos)
+const POLLING_INTERVAL_MS = 15000;
 
 function App() {
-  // Estados para os dados
-  const [latestReading, setLatestReading] = useState(null);
-  const [allReadings, setAllReadings] = useState([]); // Estado para todas as leituras (para o gráfico)
+  // Estados para armazenar os dados recebidos dos endpoints
+  const [ultimaLeitura, setUltimaLeitura] = useState(null);
+  const [leituras24h, setLeituras24h] = useState([]);
+  // Estado para armazenar mensagens de erro globais
+  const [erro, setErro] = useState(null);
+  // Estados de loading separados para a carga inicial de cada seção
+  const [isLoadingUltimaInicial, setIsLoadingUltimaInicial] = useState(true);
+  const [isLoading24hInicial, setIsLoading24hInicial] = useState(true);
 
-  // URLs dos seus endpoints
-  const LATEST_READING_URL = 'https://projeto-caixa-dagua-api.onrender.com/leituras/ultima';
-  // URL para todas as leituras (ajuste se precisar passar um parâmetro para 24h)
-  const ALL_READINGS_URL = 'https://projeto-caixa-dagua-api.onrender.com/leituras'; // Assumindo que retorna uma lista, talvez grande
+  // URLs dos seus endpoints no back-end Render
+  // VERIFIQUE: se estes são os URLs e caminhos EXATOS que seu backend expõe
+  const ULTIMA_LEITURA_URL = "https://projeto-caixa-dagua-api.onrender.com/ultima-leitura";
+  const ULTIMAS_24H_URL = "https://projeto-caixa-dagua-api.onrender.com/ultimas-24h"; // Assumindo que retorna uma lista
 
-  // Função para buscar dados (agora busca última e todas as leituras)
-  const fetchData = async () => {
+  // Função auxiliar centralizada para buscar dados
+  const fetchData = async (url, setData, setLoading, setError, isPolling = false) => {
+    if (!isPolling && setLoading) {
+      setLoading(true);
+    }
     try {
-      // Busca a última leitura
-      const latestResponse = await fetch(LATEST_READING_URL);
-      if (latestResponse.ok) {
-        const latestData = await latestResponse.json();
-        setLatestReading(latestData);
-      } else {
-         console.error(`Erro HTTP ao buscar última leitura! Status: ${latestResponse.status}`);
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`Erro ${res.status}: ${res.statusText || "Falha ao buscar dados"}`);
       }
-
-      // Busca todas as leituras (para o gráfico)
-      const allResponse = await fetch(ALL_READINGS_URL);
-      if (allResponse.ok) {
-         const allData = await allResponse.json();
-         // *** AQUI: Você pode filtrar allData para as últimas 24h SE o backend retornar mais do que isso ***
-         // Exemplo conceitual (requer lógica de data):
-         // const last24HoursData = allData.filter(item => isWithinLast24Hours(item.created_on));
-         // setAllReadings(last24HoursData);
-         // Por enquanto, apenas armazena todos os dados recebidos:
-         setAllReadings(allData);
-
-      } else {
-          console.error(`Erro HTTP ao buscar todas as leituras! Status: ${allResponse.status}`);
-       }
-
+      const data = await res.json();
+      setData(data);
+      // Limpa o erro global *somente se* esta busca específica foi bem-sucedida
+      // Se outra busca ainda tiver um erro ativo, isso pode ser um problema.
+      // Uma abordagem mais robusta poderia limpar o erro apenas se *todas* as buscas estiverem ok,
+      // ou ter erros separados por seção. Por enquanto, vamos manter assim.
+      // Consideração: Se uma busca falha (e define erro) e a outra tem sucesso (e limpa erro),
+      // o erro pode "piscar". Para este app, provavelmente ok.
+       setError(null); // Limpa erro em caso de sucesso
     } catch (err) {
-      console.error("Erro ao buscar dados:", err);
+      console.error(`Erro ao buscar dados de ${url}:`, err);
+      setError(err.message); // Define o erro global
+    } finally {
+      if (!isPolling && setLoading) {
+        setLoading(false);
+      }
     }
   };
 
-  // useEffect para buscar dados na montagem
+  // ---- Efeito para Carga Inicial do Histórico (Últimas 24h) ----
   useEffect(() => {
-    fetchData();
-    // Opcional: buscar dados periodicamente (a cada 60 segundos, por exemplo)
-    // const intervalId = setInterval(fetchData, 60000);
-    // return () => clearInterval(intervalId); // Limpa o intervalo na desmontagem
-  }, []);
+    console.log("Buscando histórico inicial (24h)...");
+    fetchData(
+      ULTIMAS_24H_URL,
+      (data) => {
+        // VERIFIQUE: Nome do campo de data ('timestamp' ou 'created_on')
+        const formattedData = Array.isArray(data)
+          ? data
+              .map((item) => ({
+                ...item,
+                distancia: typeof item.distancia === "number" ? item.distancia : null,
+                timestamp: new Date(item.timestamp || item.created_on).getTime(), // Tenta 'timestamp', fallback para 'created_on'
+              }))
+              // Filtra itens onde a conversão de data falhou (resultando em NaN) ou distancia é null
+              .filter(item => !isNaN(item.timestamp) && item.distancia !== null)
+              .sort((a, b) => a.timestamp - b.timestamp) // Ordena por timestamp
+          : [];
+        setLeituras24h(formattedData);
+      },
+      setIsLoading24hInicial,
+      setErro
+    );
+  }, []); // Executa só uma vez
 
-  // Função para formatar a data/hora
-   const formatTimestamp = (timestampString) => {
-      if (!timestampString) return 'N/A';
-      try {
-          const date = new Date(timestampString);
-          if (isNaN(date.getTime())) {
-              throw new Error("Data inválida");
-          }
-          return date.toLocaleString();
-      } catch (e) {
-          console.error("Erro ao formatar timestamp:", timestampString, e);
-          return timestampString;
+  // ---- Efeito para Carga Inicial E Polling da Última Leitura ----
+  useEffect(() => {
+    // 1. Busca Inicial
+    console.log("Buscando última leitura inicial...");
+    fetchData(
+      ULTIMA_LEITURA_URL,
+      (data) => {
+        // VERIFIQUE: Nome do campo de data ('timestamp' ou 'created_on')
+        setUltimaLeitura(data); // Assume que o backend retorna o objeto diretamente
+      },
+      setIsLoadingUltimaInicial,
+      setErro
+    );
+
+    // 2. Configura o Polling
+    console.log(`Configurando polling a cada ${POLLING_INTERVAL_MS / 1000} segundos...`);
+    const intervalId = setInterval(() => {
+      console.log("Polling: Buscando última leitura...");
+      fetchData(
+        ULTIMA_LEITURA_URL,
+        (data) => {
+           // VERIFIQUE: Nome do campo de data ('timestamp' ou 'created_on')
+          setUltimaLeitura(data);
+        },
+        null, // Não usa setLoading no polling
+        setErro,
+        true // Indica que é polling
+      );
+    }, POLLING_INTERVAL_MS);
+
+    // 3. Função de Limpeza
+    return () => {
+      console.log("Limpando intervalo de polling.");
+      clearInterval(intervalId);
+    };
+  }, []); // Executa só uma vez
+
+  // Funções auxiliares de formatação de data/hora
+  const formatXAxis = (timestamp) =>
+    typeof timestamp === "number" && !isNaN(timestamp)
+      ? new Date(timestamp).toLocaleTimeString("pt-BR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "America/Recife",
+        })
+      : "N/A";
+
+  const formatTooltipLabel = (timestamp) =>
+    typeof timestamp === "number" && !isNaN(timestamp)
+      ? new Date(timestamp).toLocaleString("pt-BR", {
+          dateStyle: "short",
+          timeStyle: "medium",
+          timeZone: "America/Recife",
+        })
+      : "N/A";
+
+  const formatUltimaLeituraTimestamp = (timestampString) => {
+    if (!timestampString) return "Indisponível";
+    try {
+      const date = new Date(timestampString);
+      if (isNaN(date.getTime())) {
+        throw new Error("Data inválida recebida do backend");
       }
+      return date.toLocaleString("pt-BR", {
+        dateStyle: "full",
+        timeStyle: "medium",
+        timeZone: "America/Recife",
+      });
+    } catch (e) {
+      console.error("Erro ao formatar timestamp da última leitura:", timestampString, e);
+      return "Data inválida";
+    }
   };
 
-  // *** PREPARAR DADOS PARA O GRÁFICO AQUI ***
-  // Esta lógica dependerá da biblioteca de gráficos e do formato exato de allReadings
-  // Exemplo conceitual para Chart.js:
-  const chartData = {
-      labels: allReadings.map(item => formatTimestamp(item.created_on)), // Eixos X (tempo)
-      datasets: [
-          {
-              label: 'Distância (cm)',
-              data: allReadings.map(item => item.distancia), // Eixo Y (valor)
-              fill: false,
-              backgroundColor: 'rgba(75,192,192,0.2)',
-              borderColor: 'rgba(75,192,192,1)',
-          },
-      ],
-  };
-
-  // Opções do gráfico (exemplo Chart.js)
-  const chartOptions = {
-      responsive: true,
-      plugins: {
-          title: {
-              display: true,
-              text: 'Leituras das Últimas 24h', // Título do gráfico
-              color: var('--primary-blue-light'), // Use a string for the CSS variable
-          },
-      },
-      scales: {
-          x: { // Eixo X (tempo)
-            // type: 'time', // Pode ser necessário configurar tipo time scale dependendo da lib e formato data
-            title: { display: true, text: 'Horário', color: var('--text-medium') },
-            ticks: { color: var('--text-dark') },
-            grid: { color: var('--border-color') },
-          },
-          y: { // Eixo Y (distância)
-            title: { display: true, text: 'Distância (cm)', color: var('--text-medium') },
-            ticks: { color: var('--text-dark') },
-            grid: { color: var('--border-color') },
-          }
-      },
-       maintainAspectRatio: false, // Permite controlar o tamanho pelo container
-  };
-
-
+  // Renderização do componente (JSX)
   return (
-    <div className="app-container"> {/* Container Flexbox principal */}
+    <div className="flex flex-col items-center justify-start min-h-screen p-4 sm:p-6 bg-slate-900 font-sans">
+      <div className="w-full max-w-7xl"> {/* Aumentado max-w para acomodar melhor */}
 
-      {/* Título principal acima das colunas */}
-      <h1>Leituras da Caixa D'água</h1>
+        <h1 className="text-4xl sm:text-5xl font-extrabold text-center mb-2 tracking-tight bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent drop-shadow-sm">
+          Monitoramento da Caixa d'Água
+        </h1>
 
-      {/* Coluna 1: Última Leitura e Info Usuário (1/3) */}
-      <div className="column part-1">
-          <h2>Última Leitura</h2>
-          <div className="reading-container">
-              {latestReading ? (
-                  <div>
-                      <p><strong>ID:</strong> {latestReading.id || 'N/A'}</p>
-                      {/* Ajuste a label para refletir que é distância, que geralmente é inversamente proporcional ao nível */}
-                      <p><strong>Distância (Nível):</strong> {latestReading.distancia !== undefined ? `${latestReading.distancia} cm` : 'N/A'}</p>
-                      <p><strong>Horário:</strong> {formatTimestamp(latestReading.created_on)}</p>
+        <p dir="rtl" className="text-lg sm:text-xl text-center mb-8 sm:mb-10 text-slate-400 font-sans">
+          مراقبة خزان المياه {/* Tradução: Monitoramento do tanque de água */}
+        </p>
+
+        {/* Mensagem de Erro Global */}
+        {erro && (
+          <div className="bg-red-900/80 border border-red-700 text-red-200 px-4 py-3 rounded-lg relative mb-6 text-center shadow" role="alert">
+            <strong className="font-bold">Ocorreu um erro:</strong>{" "}
+            <span className="block sm:inline ml-2">{erro}</span>
+          </div>
+        )}
+
+        {/* Grid Principal */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+
+          {/* Coluna da Esquerda: Última Leitura */}
+          <div className="md:col-span-1 flex flex-col"> {/* Removido gap-8 daqui, pois só tem um item */}
+            <div className="bg-slate-800 rounded-xl shadow-lg p-6 sm:p-8 transition-shadow hover:shadow-xl border border-slate-700 h-full flex flex-col"> {/* Adicionado h-full e flex flex-col */}
+              <h2 className="text-xl sm:text-2xl font-semibold mb-5 text-slate-100 border-b pb-2 border-slate-700 flex-shrink-0"> {/* Adicionado flex-shrink-0 */}
+                Última Leitura
+              </h2>
+              <div className="flex-grow flex items-center justify-center"> {/* Div para centralizar conteúdo */}
+                {isLoadingUltimaInicial ? (
+                  <LoadingSpinner />
+                ) : ultimaLeitura ? (
+                  <div className="text-slate-300 space-y-3 text-base sm:text-lg">
+                    {/* VERIFIQUE: Nome do campo 'timestamp' ou 'created_on' no objeto ultimaLeitura */}
+                    <p>
+                      <span className="font-medium text-slate-100">ID:</span>{" "}
+                      {ultimaLeitura.id || "N/A"}
+                    </p>
+                    <p>
+                      <span className="font-medium text-slate-100">Nível:</span>{" "}
+                      {typeof ultimaLeitura.distancia === "number"
+                        ? `${ultimaLeitura.distancia.toFixed(1)} cm`
+                        : "Indisponível"}
+                    </p>
+                    <p>
+                      <span className="font-medium text-slate-100">Data:</span>{" "}
+                      {formatUltimaLeituraTimestamp(ultimaLeitura.timestamp || ultimaLeitura.created_on)}
+                    </p>
                   </div>
-              ) : (
-                  <p className="loading-text">Aguardando última leitura...</p>
-              )}
+                ) : !erro ? ( // Só mostra "Nenhuma leitura" se não houver erro
+                  <p className="text-slate-500 text-center">Nenhuma leitura disponível.</p>
+                ): null } {/* Se houver erro, a mensagem de erro global já é mostrada */}
+              </div>
+            </div>
           </div>
 
-          {/* Informações do Usuário */}
-          <div className="user-info">
-              {/* Substitua 'sua-foto.jpg' pelo caminho da sua foto */}
-              {/* Crie uma pasta 'public' na raiz do projeto e coloque a foto lá, ex: /public/minha-foto.jpg --> src="/minha-foto.jpg" */}
-              <img src="/caminho-para-sua-foto.jpg" alt="Sua Foto" />
-              <p>Seu Nome Completo</p> {/* Substitua pelo seu nome */}
-              {/* Adicione outras informações se quiser */}
+          {/* Coluna da Direita: Gráfico Histórico */}
+          <div className="md:col-span-2">
+            <div className="bg-slate-800 rounded-xl shadow-lg p-6 sm:p-8 transition-shadow hover:shadow-xl border border-slate-700 h-full flex flex-col">
+              <h2 className="text-xl sm:text-2xl font-semibold mb-5 text-slate-100 border-b pb-2 border-slate-700 flex-shrink-0">
+                Histórico - Últimas 24 Horas
+              </h2>
+              <div className="flex-grow min-h-[300px] sm:min-h-[400px]"> {/* Garante altura mínima para o gráfico */}
+                {isLoading24hInicial ? (
+                  <LoadingSpinner />
+                ) : leituras24h.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={leituras24h}
+                      margin={{
+                        top: 5,
+                        right: 20, // Aumentado para evitar corte de label
+                        left: 0,  // Ajustado para texto da YAxis
+                        bottom: 5,
+                      }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#475569" /> {/* Cor do grid slate-600 */}
+                      <XAxis
+                        dataKey="timestamp"
+                        tickFormatter={formatXAxis}
+                        stroke="#94a3b8" // Cor do eixo e ticks slate-400
+                        tick={{ fontSize: 12 }}
+                        // interval="preserveStartEnd" // Pode ajudar a garantir o primeiro/último tick
+                        // minTickGap={50} // Aumenta espaço entre ticks se ficarem muito juntos
+                      />
+                      <YAxis
+                        dataKey="distancia"
+                        stroke="#94a3b8" // Cor do eixo e ticks slate-400
+                        tick={{ fontSize: 12 }}
+                        domain={['dataMin - 5', 'dataMax + 5']} // Adiciona um pouco de padding
+                        label={{ value: 'Nível (cm)', angle: -90, position: 'insideLeft', fill: '#cbd5e1', fontSize: 14, dx: -10 }} // Adiciona label no eixo Y
+                        unit=" cm" // Adiciona unidade aos ticks
+                      />
+                      <Tooltip
+                        labelFormatter={formatTooltipLabel}
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} // Estilo do tooltip (slate-800/700)
+                        labelStyle={{ color: '#f1f5f9' }} // Cor do label (slate-100)
+                        itemStyle={{ color: '#38bdf8' }} // Cor do item (sky-400)
+                        formatter={(value) => [`${value.toFixed(1)} cm`, 'Nível']} // Formata valor e nome na tooltip
+                      />
+                      <Legend wrapperStyle={{ color: '#e2e8f0', paddingTop: '10px' }} /> {/* Cor da legenda (slate-200) */}
+                      <Line
+                        type="monotone"
+                        dataKey="distancia"
+                        name="Nível" // Nome que aparece na legenda e tooltip
+                        stroke="#38bdf8" // Cor da linha (sky-400)
+                        strokeWidth={2}
+                        dot={false} // Oculta os pontos individuais
+                        activeDot={{ r: 6, fill: '#0ea5e9', stroke: '#f8fafc', strokeWidth: 2 }} // Estilo do ponto ativo (hover)
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : !erro ? ( // Só mostra "Nenhum dado" se não houver erro
+                  <div className="flex justify-center items-center h-full">
+                      <p className="text-slate-500">Nenhum dado histórico disponível.</p>
+                  </div>
+                ) : null } {/* Se houver erro, a mensagem de erro global já é mostrada */}
+              </div>
+            </div>
           </div>
-      </div>
 
-      {/* Coluna 2: Gráfico (2/3) */}
-      <div className="column part-2">
-          <h2>Gráfico das Últimas Leituras</h2>
-          <div className="graph-container">
-              {/* *** ÁREA DO GRÁFICO *** */}
-              {allReadings.length > 0 ? (
-                  // *** RENDERIZAR O COMPONENTE DO GRÁFICO AQUI ***
-                  // Exemplo para react-chartjs-2:
-                  // <Line data={chartData} options={chartOptions} />
-                  <p>Placeholder do Gráfico - Implementação necessária</p> // Placeholder atual
-              ) : (
-                  <p className="loading-text">Aguardando dados para o gráfico...</p>
-              )}
-               {/* Mensagem explicando a necessidade da biblioteca */}
-               {!allReadings.length && !latestReading && <p className="comment">O gráfico requer dados históricos e uma biblioteca de gráficos (ex: Chart.js + react-chartjs-2).</p>}
-          </div>
-      </div>
+        </div> {/* Fim do Grid Principal */}
 
-    </div>
-  );
-}
+      </div> {/* Fim do Container Interno */}
+    </div> /* Fim da DIV Principal */
+  ); // Fim do return
+} // Fim do componente App
 
-export default App;
+export default App; // Exporta o componente
