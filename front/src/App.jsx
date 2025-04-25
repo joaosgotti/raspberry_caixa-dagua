@@ -11,8 +11,10 @@ import {
   ResponsiveContainer
 } from "recharts";
 
-import './App.css';
+// Importa o CSS (certifique-se que App.css existe ou remova o import)
+// import './App.css'; // Descomente se você tiver App.css
 
+// Componente LoadingSpinner
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-full">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-400"></div>
@@ -20,6 +22,7 @@ const LoadingSpinner = () => (
   </div>
 );
 
+// Defina o intervalo de polling em milissegundos
 const POLLING_INTERVAL_MS = 15000;
 
 function App() {
@@ -29,9 +32,11 @@ function App() {
   const [isLoadingUltimaInicial, setIsLoadingUltimaInicial] = useState(true);
   const [isLoading24hInicial, setIsLoading24hInicial] = useState(true);
 
-  const ULTIMA_LEITURA_URL = "https://projeto-caixa-dagua-api.onrender.com/ultima-leitura";
-  const ULTIMAS_24H_URL = "https://projeto-caixa-dagua-api.onrender.com/ultimas-24h";
+  // URLs da API (considere usar variáveis de ambiente)
+  const ULTIMA_LEITURA_URL = "https://projeto-caixa-dagua-api.onrender.com/leituras/ultima";
+  const ULTIMAS_24H_URL = "https://projeto-caixa-dagua-api.onrender.com/leituras";
 
+  // Função auxiliar para buscar dados
   const fetchData = async (url, setData, setLoading, setError, isPolling = false) => {
     if (!isPolling && setLoading) {
        setLoading(true);
@@ -46,7 +51,7 @@ function App() {
       }
       const data = await res.json();
       setData(data);
-      setError(null);
+      setError(null); // Limpa erro se sucesso
     } catch (err) {
       console.error(`Erro ao buscar dados de ${url}:`, err);
       setError(err.message || "Ocorreu um erro desconhecido");
@@ -57,6 +62,7 @@ function App() {
     }
   };
 
+  // ---- Efeitos ----
   useEffect(() => {
     console.log("Buscando histórico inicial (24h)...");
     fetchData(
@@ -109,6 +115,7 @@ function App() {
     };
   }, []);
 
+  // ---- Funções de Formatação ----
   const formatXAxis = (timestamp) =>
     typeof timestamp === 'number' && !isNaN(timestamp) ? new Date(timestamp).toLocaleTimeString('pt-BR', {
       hour: '2-digit',
@@ -141,8 +148,11 @@ function App() {
     }
   }
 
+  // ---- Renderização JSX ----
   return (
+    // 1: Div Principal (Aberta)
     <div className="flex flex-col items-center justify-start min-h-screen p-4 sm:p-6 bg-slate-900 font-sans text-slate-200">
+      {/* 2: Div Container Interno (Aberta) */}
       <div className="w-full max-w-6xl">
         <h1 className="text-4xl sm:text-5xl font-extrabold text-center mb-2 tracking-tight bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent drop-shadow-sm">
           Monitoramento da Caixa d'Água
@@ -157,10 +167,13 @@ function App() {
           </div>
         )}
 
+        {/* 3: Div Grid Principal (Aberta) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
 
+          {/* 4: Div Coluna Esquerda (Aberta) */}
           <div className="md:col-span-1 flex flex-col gap-6 lg:gap-8">
 
+            {/* Card da Última Leitura */}
             <div className="bg-slate-800 rounded-xl shadow-lg p-6 sm:p-8 transition-shadow hover:shadow-xl border border-slate-700 flex flex-col min-h-[180px]">
               <h2 className="text-xl sm:text-2xl font-semibold mb-5 text-slate-100 border-b pb-2 border-slate-700 flex-shrink-0">
                 Última Leitura
@@ -179,23 +192,27 @@ function App() {
               </div>
             </div>
 
-            <div className="bg-slate-800 rounded-xl shadow-lg p-4 transition-shadow hover:shadow-xl border border-slate-700 flex items-center gap-4">
+            {/* Bloco de Perfil */}
+            <div className="bg-slate-800 rounded-xl shadow-lg p-12 transition-shadow hover:shadow-xl border border-slate-700 flex items-center gap-4">
               <img
-                src="/jvsv.jpg"
+                src="/jvsv.jpg" // Certifique-se que está na pasta /public
                 alt="Foto de João Vitor"
                 className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-sky-400 flex-shrink-0"
               />
               <div>
                 <p className="text-xs sm:text-sm text-slate-400">Desenvolvido por:</p>
-                <p className="text-base sm:text-lg font-semibold text-slate-100">João Vítor Sgotti Veiga</p>
+                <p className="text-base sm:text-lg font-semibold text-slate-100">João V. Sgotti Veiga</p>
               </div>
             </div>
           </div>
+          {/* 4: Div Coluna Esquerda (Fechada) */}
 
+          {/* 5: Div Coluna Direita (Aberta) */}
           <div className="md:col-span-2 bg-slate-800 rounded-xl shadow-lg p-6 sm:p-8 transition-shadow hover:shadow-xl border border-slate-700 flex flex-col">
             <h2 className="text-xl sm:text-2xl font-semibold mb-5 text-slate-100 border-b pb-2 border-slate-700 flex-shrink-0">
               Histórico (Últimas 24h)
             </h2>
+            {/* 6: Div Container do Gráfico/Spinner/Mensagem (Aberta) */}
             <div className="flex-grow min-h-[300px]">
               {isLoading24hInicial ? (
                 <div className="h-[300px] flex items-center justify-center"><LoadingSpinner /></div>
@@ -237,17 +254,21 @@ function App() {
                   </LineChart>
                 </ResponsiveContainer>
               ) : !erro ? (
+                 // Caso: Sem dados e sem erro
                 <div className="h-[300px] flex items-center justify-center">
                     <p className="text-slate-500">Nenhum dado histórico disponível.</p>
                 </div>
-              ) : null }
+              ) : null /* Caso: Com erro (mensagem global é mostrada) */ }
             </div>
+             
           </div>
-
+           
         </div>
-      </div>
-    </div>
-  );
-}
 
-export default App;
+      </div>
+
+    </div>
+  ); // Fim do return statement
+} // <--- FECHAMENTO CORRETO DA FUNÇÃO App
+
+export default App; // Exporta o componente
