@@ -136,4 +136,3 @@ def get_median_distance(num_readings=NUM_READINGS_PER_CYCLE,
         print(f"[Sensor Mod] Não foi possível calcular a mediana ({len(readings)}/{num_readings} leituras válidas, mínimo: {min_valid}).")
         return None
 
-# Nota: NÃO HÁ MAIS o bloco if __name__ == "__main__": aqui.
