@@ -64,38 +64,38 @@ def run_publisher_with_sensor():
         # 4. Loop Principal de Leitura (Mediana) e Publicação
         print("\n--- Iniciando Loop de Leitura da Mediana e Publicação (Ctrl+C para parar) ---")
         while True:
-            cycle_start_time = time.time() # Marca o início do ciclo
+            #cycle_start_time = time.time() # Marca o início do ciclo
 
             # --- MODIFICADO: Lê a MEDIANA da distância ---
             # Em vez de read_distance(), chamamos get_median_distance()
             median_distance_value = sensor_reader.get_median_distance()
 
-            if median_distance_value is not None:
+            #if median_distance_value is not None:
                 # Validação básica da MEDIANA lida
                 # A faixa de validação pode ser a mesma ou ajustada se necessário
-                if 5 < median_distance_value < 400:
-                    print(f"Mediana do sensor: {median_distance_value:.1f} cm (Válida)")
+                #if 5 < median_distance_value < 400:
+            print(f"Mediana do sensor: {median_distance_value:.1f} cm (Válida)")
                     # Cria o payload (dados a serem enviados)
-                    payload_dict = {
+            payload_dict = {
                         # Usar a mediana aqui
-                        "distancia": round(median_distance_value),
-                        "created_on": datetime.now(timezone.utc).isoformat()
+                    "distancia": round(median_distance_value),
+                    "created_on": datetime.now(timezone.utc).isoformat()
                     }
                     # Publica os dados formatados como JSON
-                    publisher.publish_data(payload_dict)
-                else:
-                    print(f"Mediana do sensor: {median_distance_value:.1f} cm (Fora da faixa esperada, ignorando)")
-            else:
+            publisher.publish_data(payload_dict)
+                #else:
+                    #print(f"Mediana do sensor: {median_distance_value:.1f} cm (Fora da faixa esperada, ignorando)")
+            #else:
                 # A função get_median_distance já imprime mensagens de erro internas
-                print("[Publisher Main] Falha ao obter a mediana do sensor. Pulando a publicação.")
+                #print("[Publisher Main] Falha ao obter a mediana do sensor. Pulando a publicação.")
 
             # --- MODIFICADO: Cálculo preciso do tempo de espera ---
-            cycle_end_time = time.time()
-            elapsed_time = cycle_end_time - cycle_start_time
-            sleep_time = max(0, config.PUBLISH_INTERVAL_SECONDS - elapsed_time)
+            #cycle_end_time = time.time()
+            #elapsed_time = cycle_end_time - cycle_start_time
+            #sleep_time = max(0, config.PUBLISH_INTERVAL_SECONDS - elapsed_time)
 
-            print(f"Ciclo levou {elapsed_time:.2f}s. Aguardando {sleep_time:.2f}s para o próximo...")
-            time.sleep(sleep_time) # Espera o tempo restante para completar o intervalo
+            #print(f"Ciclo levou {elapsed_time:.2f}s. Aguardando {sleep_time:.2f}s para o próximo...")
+            time.sleep(config.PUBLISH_INTERVAL_SECONDS) # Espera o tempo restante para completar o intervalo
 
     except KeyboardInterrupt:
         print("\nInterrupção pelo usuário (Ctrl+C) recebida. Encerrando o publisher...")
