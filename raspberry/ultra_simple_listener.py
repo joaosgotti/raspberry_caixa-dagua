@@ -103,7 +103,7 @@ except OSError as e:
      print(f"\nERRO DE REDE/OS durante conexão/loop: {e}")
      print("Verifique conectividade, DNS, firewall.")
 except Exception as e:
-    print(f"\nERRO INES imprimir tracebacks completos em erros
+    print(f"\nERRO INES imprimir tracebacks completos em erros")
 
 print("--- Iniciando Teste MQTT Ultra Simples (Hardcoded) ---")
 
