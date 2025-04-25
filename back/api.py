@@ -4,9 +4,10 @@ from fastapi import FastAPI, HTTPException # HTTPException para retornar erros H
 from fastapi.middleware.cors import CORSMiddleware # Middleware para lidar com requisições CORS (acesso de frontend)
 import psycopg2 # Driver para interagir com o banco de dados PostgreSQL
 from psycopg2.extras import RealDictCursor # Permite que os resultados das queries sejam dicionários Python
-from datetime import datetime, timedelta # Para trabalhar com datas e calcular intervalos de tempo
+from datetime import datetime, timedelta, timezone # Importa timezone para manipulação de fusos horários
 import os # Para acessar variáveis de ambiente
 from dotenv import load_dotenv # Para carregar variáveis de ambiente de um arquivo .env
+import pytz # Biblioteca para trabalhar com fusos horários (deve ser instalada: pip install pytz)
 
 # --- Carregamento de Variáveis de Ambiente ---
 # Carrega variáveis definidas em um arquivo .env no ambiente do processo.
@@ -27,7 +28,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], # Define quais origens podem acessar a API. Use ["*"] apenas para desenvolvimento/teste.
-                         # Em produção, substitua por uma lista de strings, ex: ["https://seu-frontend.com"]
+                        # Em produção, substitua por uma lista de strings, ex: ["https://seu-frontend.com"]
     allow_credentials=True, # Permite cookies e cabeçalhos de autenticação na requisição cross-origin
     allow_methods=["*"], # Métodos HTTP permitidos (GET, POST, PUT, DELETE, etc.). "*" permite todos.
     allow_headers=["*"], # Cabeçalhos HTTP permitidos na requisição cross-origin. "*" permite todos.
@@ -101,9 +102,9 @@ def connect_db():
 @app.get("/leitura/ultima", summary="Obter a última leitura de distância")
 def get_ultima_leitura():
     """
-    Busca a leitura de distância mais recente registrada no banco de dados.
+    Busca a leitura de distância mais recente registrada no banco de dados e a retorna com o fuso horário de Recife.
 
-    Retorna um objeto JSON contendo os detalhes da última leitura (distância, timestamp).
+    Retorna um objeto JSON contendo os detalhes da última leitura (distância, timestamp no fuso horário de Recife).
     Se nenhuma leitura for encontrada, retorna um objeto vazio {}.
     Retorna 503 se não conseguir conectar ao DB, 500 para outros erros.
     """
@@ -122,12 +123,19 @@ def get_ultima_leitura():
             # Executa a query para selecionar todos os campos (*) da tabela 'leituras'
             # Ordena por 'created_on' (coluna usada para o timestamp na inserção MQTT) em ordem decrescente (mais recente primeiro)
             # Limita o resultado a 1 linha para obter apenas a última leitura
-            cur.execute("SELECT * FROM leituras ORDER BY created_on DESC LIMIT 1;")
+            cur.execute("SELECT id, distancia, created_on FROM leituras ORDER BY created_on DESC LIMIT 1;")
             # Obtém a primeira (e única) linha do resultado
             result = cur.fetchone()
 
-        # Se uma leitura foi encontrada, retorna o dicionário. Caso contrário, retorna um dicionário vazio.
-        return result if result else {}
+        # Se uma leitura foi encontrada, converte o fuso horário e retorna o dicionário.
+        if result:
+            utc_datetime = result['created_on'].replace(tzinfo=timezone.utc)
+            local_timezone = pytz.timezone('America/Recife')
+            local_datetime = utc_datetime.astimezone(local_timezone)
+            result['created_on'] = local_datetime.isoformat()
+            return result
+        else:
+            return {}
 
     # Re-levanta exceções HTTPException que já foram geradas (ex: 503 da falha de conexão)
     except HTTPException as http_exc:
@@ -146,7 +154,7 @@ def get_ultima_leitura():
                 conn.close()
                 # print("API Conexão com DB fechada.") # Log opcional de fechamento
             except psycopg2.Error as close_err:
-                 print(f"API Erro ao fechar conexão DB em /leitura/ultima: {close_err}")
+                print(f"API Erro ao fechar conexão DB em /leitura/ultima: {close_err}")
 
 
 @app.get("/leituras", summary="Obter leituras de distância em um período")
@@ -155,14 +163,16 @@ def get_leituras_por_periodo(
 ):
     """
     Busca todas as leituras de distância registradas no banco de dados
-    dentro de um determinado período de tempo em relação ao momento atual.
+    dentro de um determinado período de tempo em relação ao momento atual
+    e as retorna com o fuso horário de Recife.
 
     Args:
         periodo_horas: O número de horas para trás a partir do momento atual
-                       para incluir nas leituras. Padrão: 24 horas.
+                      para incluir nas leituras. Padrão: 24 horas.
 
     Retorna uma lista de objetos JSON (dicionários) contendo as leituras
-    dentro do período especificado, ordenadas por timestamp ascendente.
+    dentro do período especificado, com o timestamp no fuso horário de Recife,
+    ordenadas por timestamp ascendente.
     Se nenhuma leitura for encontrada no período, retorna uma lista vazia [].
     Retorna 503 se não conseguir conectar ao DB, 500 para outros erros.
     """
@@ -176,16 +186,23 @@ def get_leituras_por_periodo(
 
         # Usa um bloco 'with' para o cursor e o RealDictCursor
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Calcula o timestamp limite subtraindo o período_horas do momento atual
-            limite_tempo = datetime.now() - timedelta(hours=periodo_horas)
+            # Calcula o timestamp limite subtraindo o período_horas do momento atual (em UTC)
+            limite_tempo_utc = datetime.now(timezone.utc) - timedelta(hours=periodo_horas)
 
-            # Executa a query para selecionar leituras onde 'created_on' (timestamp da leitura)
+            # Executa a query para selecionar leituras onde 'created_on' (timestamp da leitura em UTC)
             # é maior ou igual ao limite_tempo calculado.
             # Ordena os resultados por 'created_on' em ordem ascendente (mais antiga primeiro).
             # Usa %s como placeholder para o valor limite_tempo para evitar SQL injection.
-            cur.execute("SELECT * FROM leituras WHERE created_on >= %s ORDER BY created_on ASC;", (limite_tempo,))
+            cur.execute("SELECT id, distancia, created_on FROM leituras WHERE created_on >= %s ORDER BY created_on ASC;", (limite_tempo_utc,))
             # Obtém todas as linhas do resultado da query em uma lista de dicionários
             resultados = cur.fetchall()
+
+        # Converte o fuso horário de cada resultado para Recife
+        for leitura in resultados:
+            utc_datetime = leitura['created_on'].replace(tzinfo=timezone.utc)
+            local_timezone = pytz.timezone('America/Recife')
+            local_datetime = utc_datetime.astimezone(local_timezone)
+            leitura['created_on'] = local_datetime.isoformat()
 
         # Retorna a lista de resultados. Se não houver resultados, retorna uma lista vazia [].
         return resultados
@@ -201,19 +218,8 @@ def get_leituras_por_periodo(
     finally:
         # Garante que a conexão com o banco de dados seja fechada
         if conn:
-             try:
+            try:
                 conn.close()
                 # print("API Conexão com DB fechada.") # Log opcional de fechamento
-             except psycopg2.Error as close_err:
-                 print(f"API Erro ao fechar conexão DB em /leituras: {close_err}")
-
-
-# --- Como Rodar a API ---
-# Este script NÃO inclui o bloco if __name__ == "__main__": uvicorn.run(...)
-# Isso é comum quando a aplicação será executada por um servidor WSGI (como uvicorn)
-# em ambientes de produção (como Render, Heroku, etc.), onde o comando de startup
-# é configurado externamente.
-#
-# Para rodar localmente para testes, você usaria um comando no terminal como:
-# uvicorn seu_arquivo_api:app --reload
-# (Assumindo que o arquivo se chama 'seu_arquivo_api.py')
+            except psycopg2.Error as close_err:
+                print(f"API Erro ao fechar conexão DB em /leituras: {close_err}")
