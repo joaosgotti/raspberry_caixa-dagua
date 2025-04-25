@@ -1,127 +1,73 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# main_listener.py (Adaptado para Listener Simplificado)
+# main_listener.py
+# Script principal para iniciar o listener MQTT e o handler do banco de dados.
+# Utiliza os módulos mqtt_listener e database_handler.
 
-import sys
 import time
-import config
+import sys
 
-# --- Dependências ---
+# Módulos locais do projeto
 try:
-    # Mantenha comentado se não for usar DB
-    # from db_handler import DatabaseHandler
-    from mqtt_listener_logic import MQTTListener # Importa a versão SIMPLIFICADA agora
-    # Mantenha comentado se não for usar DB
-    # import psycopg2
-    import paho.mqtt.client as mqtt # Para acesso ao client dentro do listener
+    import config # Apenas para verificar a configuração do DB
+    from mqtt_listener import MQTTListener
+    from database_handler import DatabaseHandler
 except ImportError as e:
-     missing_module = str(e).split("'")[-2]
-     print(f"Erro CRÍTICO: Dependência '{missing_module}' não encontrada.")
-     # Ajuste a mensagem conforme o uso ou não do DB
-     # print("Verifique: pip install paho-mqtt psycopg2-binary python-dotenv")
-     print("Verifique: pip install paho-mqtt python-dotenv")
-     sys.exit(1)
+    print(f"Erro ao importar módulos necessários: {e}")
+    print("Verifique se os arquivos config.py, mqtt_listener.py e database_handler.py estão no mesmo diretório.")
+    sys.exit(1)
+except Exception as e:
+    print(f"Erro inesperado durante a importação: {e}")
+    sys.exit(1)
 
-def main():
-    """Função principal - versão simplificada."""
-    print("--- Iniciando Serviço MQTT Listener (VERSÃO SIMPLIFICADA) ---")
+def run_listener_with_db():
+    """Função principal para executar o listener MQTT e persistir os dados no banco de dados."""
+    print("--- Iniciando Aplicação Listener (com Banco de Dados) ---")
 
-    # 1. Configuração e Inicialização DB (Mantido COMENTADO para teste)
-    db_handler_instance = None
-    # print("[Main Listener] Verificando configuração do Banco de Dados...")
-    # if config.check_db_config():
-    #     try:
-    #         print("[Main Listener] Inicializando Database Handler...")
-    #         db_handler_instance = DatabaseHandler()
-    #         print("[Main Listener] Database Handler inicializado.")
-    #     except Exception as db_init_err:
-    #         print(f"[Main Listener] Erro CRÍTICO ao inicializar DB Handler: {db_init_err}")
-    #         sys.exit(1)
-    # else:
-    #     print("[Main Listener] ERRO CRÍTICO: Configuração do Banco de Dados ausente. Encerrando.")
-    #     sys.exit(1)
+    # 1. Verifica se a configuração do banco de dados está presente e completa no arquivo .env
+    if not config.check_db_config_present():
+        sys.exit("Configuração do banco de dados ausente ou incompleta no .env. Encerrando o listener.")
 
-    if db_handler_instance is None:
-         print("[Main Listener] *** Rodando em MODO TESTE SEM BANCO DE DADOS ***")
-
-    # 2. Inicializar Listener MQTT Simplificado
-    listener = None
-    initialization_ok = False
+    # 2. Cria uma instância do DatabaseHandler para interagir com o banco de dados
+    print("Inicializando Database Handler...")
     try:
-        print("[Main Listener] Inicializando MQTT Listener (simplificado)...")
-        listener = MQTTListener(db_handler=db_handler_instance)
-        initialization_ok = True
-        print("[Main Listener] MQTT Listener (simplificado) inicializado.")
-    except Exception as mqtt_init_err:
-         print(f"[Main Listener] Erro CRÍTICO na inicialização do MQTT Listener: {mqtt_init_err}")
-         sys.exit(1)
+        db_handler = DatabaseHandler()
+    except Exception as e:
+        print(f"Erro CRÍTICO ao inicializar o Database Handler: {e}")
+        sys.exit(1)
 
-    # 3. Conectar, Inscrever (APÓS CONECTAR!), e Escutar
-    if initialization_ok and listener:
-        print("[Main Listener] Tentando iniciar conexão MQTT...")
-        connection_attempted = listener.connect()
+    # 3. Cria uma instância do MQTTListener, passando a instância do DatabaseHandler para persistir os dados recebidos
+    print("Inicializando MQTT Listener...")
+    try:
+        listener = MQTTListener(db_handler=db_handler)
+    except Exception as e:
+        print(f"Erro CRÍTICO ao inicializar o MQTT Listener: {e}")
+        sys.exit(1)
 
-        if connection_attempted:
-            print("[Main Listener] Iniciando loop de rede Paho em background (loop_start)...")
-            listener.client.loop_start() # ESSENCIAL para processar a conexão
+    # 4. Tenta conectar ao broker MQTT
+    if not listener.connect():
+        print("Falha ao iniciar a conexão inicial com o broker MQTT. Encerrando o listener.")
+        return # Sai da função
 
-            print("[Main Listener] Aguardando confirmação de conexão...")
-            time.sleep(7) # Tempo para conectar
+    # 5. Inicia o loop principal de escuta do MQTT (esta função é bloqueante)
+    # O Paho MQTT lida com a manutenção da conexão e a recepção de mensagens dentro deste loop.
+    print("[Listener] Iniciando o loop principal de escuta (loop_forever)...")
+    try:
+        listener.start_listening() # Esta chamada bloqueará a thread principal até que ocorra uma interrupção
+    except Exception as e:
+        # Captura erros que possam ocorrer fora dos callbacks do Paho MQTT
+        print(f"Erro fatal não capturado durante o loop principal do listener: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        # Bloco finally garante que a desconexão do MQTT ocorra ao sair do loop (por Ctrl+C ou erro)
+        print("Encerrando a aplicação listener...")
+        if listener: # Verifica se a instância do listener foi criada com sucesso
+            listener.disconnect()
+        print("Aplicação listener finalizada.")
 
-            if listener.is_connected:
-                 print("[Main Listener] SUCESSO: Conexão MQTT confirmada!")
-
-                 # --- INSCRIÇÃO INICIAL (APÓS CONFIRMAR CONEXÃO) ---
-                 try:
-                     topic = config.MQTT_TOPIC
-                     qos = 1
-                     print(f"[Main Listener] Inscrevendo no tópico inicial: '{topic}' QoS {qos}...")
-                     result, mid = listener.client.subscribe(topic, qos)
-                     if result == mqtt.MQTT_ERR_SUCCESS:
-                         print(f"[Main Listener] Inscrito com sucesso (MID: {mid}).")
-                     else:
-                          print(f"[Main Listener] ERRO ao inscrever inicialmente! Código Paho: {result} - {mqtt.error_string(result)}")
-                          # Decide se quer continuar mesmo sem inscrição inicial
-                          # sys.exit(1) # Ou sair se a inscrição for crítica
-                 except Exception as sub_err:
-                      print(f"[Main Listener] ERRO EXCEPCIONAL na inscrição inicial: {sub_err}")
-                      # sys.exit(1)
-                 # --- FIM DA INSCRIÇÃO INICIAL ---
-
-                 # Só continua para o loop principal se a inscrição inicial deu certo (ou se decidiu continuar mesmo com erro)
-                 if result == mqtt.MQTT_ERR_SUCCESS: # Verifica se a inscrição deu certo
-                    print("[Main Listener] Iniciando loop principal de escuta (loop_forever)...")
-                    try:
-                        listener.start_listening() # Chama a função com loop_forever
-                    except KeyboardInterrupt:
-                        print("\n[Main Listener] Interrupção pelo usuário (Ctrl+C).")
-                    except Exception as loop_err:
-                        print(f"\n[Main Listener] ERRO INESPERADO no loop principal: {loop_err}")
-                    finally:
-                        print("[Main Listener] Saindo do loop principal...")
-                 else:
-                      print("[Main Listener] Não foi possível inscrever no tópico inicial. Encerrando.")
-
-                 # Limpeza final (executa após loop ou falha na inscrição)
-                 print("[Main Listener] Parando loop de rede Paho (loop_stop)...")
-                 listener.client.loop_stop()
-                 listener.disconnect()
-
-            else:
-                 print("[Main Listener] FALHA: Conexão MQTT NÃO confirmada após espera.")
-                 print("[Main Listener] -> Verifique logs, rede, credenciais, status do broker.")
-                 print("[Main Listener] Parando loop de rede Paho (loop_stop)...")
-                 listener.client.loop_stop()
-                 listener.disconnect()
-        else:
-            print("[Main Listener] FALHA: Erro imediato ao tentar iniciar conexão.")
-            if listener:
-                 listener.disconnect()
-    else:
-         print("[Main Listener] ERRO: Falha na inicialização.")
-
-    print("\n--- Serviço MQTT Listener Finalizado ---")
-
+# Ponto de entrada do script
 if __name__ == "__main__":
-    main()
+    # Verifica se o script está sendo executado diretamente
+    run_listener_with_db() # Chama a função principal de execução do listener

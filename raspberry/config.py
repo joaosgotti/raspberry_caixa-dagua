@@ -1,57 +1,85 @@
 # config.py
 import os
-from dotenv import load_dotenv
 import sys
+from dotenv import load_dotenv
 
-# Carrega as variáveis do arquivo .env para o ambiente
+# Carrega variáveis do .env para o ambiente
 load_dotenv()
+print("[Config] Arquivo .env carregado.")
 
 # --- Configurações MQTT ---
 MQTT_BROKER = os.getenv("MQTT_BROKER")
-MQTT_PORT = int(os.getenv("MQTT_PORT", 8883))
+MQTT_PORT_STR = os.getenv("MQTT_PORT")
 MQTT_USER = os.getenv("MQTT_USER")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
-MQTT_TOPIC = os.getenv("MQTT_TOPIC", "sensor/default_topic")
+MQTT_TOPIC = os.getenv("MQTT_TOPIC")
+MQTT_KEEPALIVE_STR = os.getenv("MQTT_KEEPALIVE")
 
 # --- Configurações Sensor RPi ---
-GPIO_TRIG_PIN = int(os.getenv("GPIO_TRIG_PIN", 23))
-GPIO_ECHO_PIN = int(os.getenv("GPIO_ECHO_PIN", 24))
-DISTANCIA_MIN_VALIDA_CM = int(os.getenv("DISTANCIA_MIN_VALIDA_CM", 10))
-DISTANCIA_MAX_VALIDA_CM = int(os.getenv("DISTANCIA_MAX_VALIDA_CM", 80))
-NUM_LEITURAS_MEDIANA = int(os.getenv("NUM_LEITURAS_MEDIANA", 7))
-INTERVALO_ENTRE_LEITURAS_MS = int(os.getenv("INTERVALO_ENTRE_LEITURAS_MS", 1000))
-INTERVALO_PUBLICACAO_S = int(os.getenv("INTERVALO_PUBLICACAO_S", 60))
-CLIENT_ID_PREFIX = os.getenv("CLIENT_ID_PREFIX", "rpi_sensor_") # Usado pelo publisher
+GPIO_TRIG_PIN_STR = os.getenv("GPIO_TRIG_PIN")
+GPIO_ECHO_PIN_STR = os.getenv("GPIO_ECHO_PIN")
+PUBLISH_INTERVAL_SECONDS_STR = os.getenv("PUBLISH_INTERVAL_SECONDS")
 
-# --- Configurações do Banco de Dados (para o Listener) ---
+# --- Configurações Banco de Dados ---
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT_STR = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = int(os.getenv("DB_PORT", 5432))
 
-# --- Validações ---
-missing_mqtt = [k for k, v in {'MQTT_BROKER': MQTT_BROKER, 'MQTT_USER': MQTT_USER, 'MQTT_PASSWORD': MQTT_PASSWORD}.items() if not v]
-if missing_mqtt:
-    print(f"Erro Crítico: Variáveis de ambiente MQTT ausentes: {', '.join(missing_mqtt)}")
-    print("Verifique seu arquivo .env")
-    sys.exit(1) # Encerra se faltar config MQTT
+# --- Validação e Conversão Mínima ---
+def get_int_env(var_str, var_name, default=None):
+    """
+    Valida e converte uma variável de ambiente para inteiro.
 
-missing_db = [k for k, v in {'DB_NAME': DB_NAME, 'DB_USER': DB_USER, 'DB_PASSWORD': DB_PASSWORD, 'DB_HOST': DB_HOST}.items() if not v]
+    Args:
+        var_str (str | None): A string da variável de ambiente a ser convertida.
+        var_name (str): O nome da variável para mensagens de erro/aviso.
+        default (int | None): Valor padrão caso a variável não esteja definida.
 
-print("[Config] Configurações carregadas do .env.")
-print(f"[Config] MQTT Broker: {MQTT_BROKER}:{MQTT_PORT}, Tópico: {MQTT_TOPIC}")
+    Returns:
+        int | None: O valor inteiro da variável ou o valor padrão.
 
+    Raises:
+        SystemExit: Se a variável for obrigatória e não estiver definida ou não for um inteiro.
+    """
+    if var_str is None:
+        if default is not None:
+            print(f"[Config] Aviso: {var_name} não definida, usando padrão {default}.")
+            return default
+        else:
+            print(f"[Config] ERRO: Variável obrigatória {var_name} não definida no .env!")
+            sys.exit(1)
+    try:
+        return int(var_str)
+    except ValueError:
+        print(f"[Config] ERRO: {var_name} ('{var_str}') não é um número inteiro!")
+        sys.exit(1)
 
-def check_db_config():
-    """Verifica se as configurações de DB estão presentes."""
-    if missing_db:
-        print(f"Erro Crítico: Variáveis de ambiente do Banco de Dados ausentes no .env: {', '.join(missing_db)}")
+# MQTT
+MQTT_PORT = get_int_env(MQTT_PORT_STR, "MQTT_PORT")
+MQTT_KEEPALIVE = get_int_env(MQTT_KEEPALIVE_STR, "MQTT_KEEPALIVE", default=60)
+
+if not all([MQTT_BROKER, MQTT_USER, MQTT_PASSWORD, MQTT_TOPIC]):
+     print("[Config] ERRO: Configurações MQTT obrigatórias ausentes no .env!")
+     sys.exit(1)
+
+# Sensor
+GPIO_TRIG_PIN = get_int_env(GPIO_TRIG_PIN_STR, "GPIO_TRIG_PIN")
+GPIO_ECHO_PIN = get_int_env(GPIO_ECHO_PIN_STR, "GPIO_ECHO_PIN")
+PUBLISH_INTERVAL_SECONDS = get_int_env(PUBLISH_INTERVAL_SECONDS_STR, "PUBLISH_INTERVAL_SECONDS", default=10)
+
+# Banco de Dados
+DB_PORT = get_int_env(DB_PORT_STR, "DB_PORT")
+
+print("[Config] Configurações processadas.")
+print(f"[Config] MQTT -> Broker: {MQTT_BROKER}:{MQTT_PORT}, Tópico: {MQTT_TOPIC}")
+print(f"[Config] Sensor -> Intervalo: {PUBLISH_INTERVAL_SECONDS}s, GPIO: {GPIO_TRIG_PIN}/{GPIO_ECHO_PIN}")
+
+def check_db_config_present():
+    """Verifica se todas as variáveis de configuração do banco de dados estão presentes."""
+    if not all([DB_HOST, DB_NAME, DB_USER, DB_PASSWORD]):
+        print("[Config] ERRO: Configurações de Banco de Dados obrigatórias ausentes no .env!")
         return False
-    print(f"[Config] DB Config OK: Host={DB_HOST}:{DB_PORT}, DB={DB_NAME}")
-    return True
-
-def check_gpio_config():
-    """Verifica se as configurações de GPIO estão presentes."""
-    print(f"[Config] GPIO Config OK: TRIG={GPIO_TRIG_PIN}, ECHO={GPIO_ECHO_PIN}")
+    print(f"[Config] DB -> Host: {DB_HOST}:{DB_PORT}, DB: {DB_NAME}")
     return True
