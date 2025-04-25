@@ -1,20 +1,19 @@
-# sensor_reader_median.py
+# sensor_reader.py
 import RPi.GPIO as GPIO
 import time
 import statistics # Para calcular a mediana
 import config     # Usa os pinos definidos no config
-import sys        # Para sys.exit em caso de erro crítico
+import sys        # Usado raramente aqui, mas pode ser útil para logs
 
 # --- Constantes ---
+# Mantemos as constantes relacionadas à leitura aqui
 NUM_READINGS_PER_CYCLE = 7       # Quantas leituras fazer por ciclo
-MIN_VALID_READINGS = 5       # Mínimo de leituras válidas para calcular a mediana (ex: > 50%)
-READING_INTERVAL_SECONDS = 1 # Intervalo (em segundos) entre as leituras dentro de um ciclo
-PUBLISH_INTERVAL_SECONDS = 60    # Intervalo (em segundos) entre os ciclos de cálculo da mediana
+MIN_VALID_READINGS = 4       # Mínimo de leituras válidas para calcular a mediana (ex: > 50%)
+READING_INTERVAL_SECONDS = 0.1 # Intervalo (em segundos) entre as leituras DENTRO de um ciclo de mediana
 
-# --- Configuração GPIO ---
-# (Movida para uma função para clareza e para poder chamar novamente se necessário)
+# --- Funções de Configuração e Limpeza (Serão chamadas pelo main_publisher.py) ---
 def setup_gpio():
-    """Inicializa os pinos GPIO para o sensor."""
+    """Inicializa os pinos GPIO para o sensor. Chamado uma vez pelo script principal."""
     try:
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
@@ -22,13 +21,24 @@ def setup_gpio():
         GPIO.setup(config.GPIO_ECHO_PIN, GPIO.IN)
         # Garante que o pino TRIG comece em LOW
         GPIO.output(config.GPIO_TRIG_PIN, GPIO.LOW)
-        print(f"[Sensor] GPIO inicializado (TRIG={config.GPIO_TRIG_PIN}, ECHO={config.GPIO_ECHO_PIN})")
+        print(f"[Sensor Mod] GPIO inicializado (TRIG={config.GPIO_TRIG_PIN}, ECHO={config.GPIO_ECHO_PIN})")
         time.sleep(0.5) # Pausa para estabilizar o sensor
-        return True
+        return True # Indica sucesso
     except Exception as e:
-        print(f"[Sensor] ERRO CRÍTICO ao inicializar GPIO: {e}")
-        print("Verifique as permissões (use sudo?) e a conexão do sensor.")
-        return False
+        print(f"[Sensor Mod] ERRO CRÍTICO ao inicializar GPIO: {e}")
+        print("[Sensor Mod] Verifique as permissões (use sudo?) e a conexão do sensor.")
+        return False # Indica falha
+
+def cleanup_gpio():
+    """Libera os recursos GPIO utilizados. Chamado uma vez pelo script principal no final."""
+    print("[Sensor Mod] Limpando GPIO...")
+    try:
+        # Limpa apenas os pinos que configuramos
+        GPIO.cleanup((config.GPIO_TRIG_PIN, config.GPIO_ECHO_PIN))
+        print("[Sensor Mod] GPIO limpo.")
+    except Exception as e:
+        # Se o cleanup falhar, pode ser que o setup nunca tenha ocorrido, logar o erro.
+        print(f"[Sensor Mod] Aviso: Erro ao limpar GPIO (pode já ter sido limpo ou setup falhou): {e}")
 
 # --- Funções do Sensor ---
 def read_distance():
@@ -53,11 +63,10 @@ def read_distance():
         timeout_limit = pulse_start_time + 0.1 # Timeout de 100ms
 
         # Espera o pino ECHO ir para HIGH (início do pulso)
-        # Usa um loop com timeout para evitar travamento
         while GPIO.input(config.GPIO_ECHO_PIN) == GPIO.LOW:
             pulse_start_time = time.time()
             if pulse_start_time > timeout_limit:
-                # print("[Sensor] Timeout ao esperar ECHO HIGH.") # Logar pode ser muito verboso aqui
+                # print("[Sensor Mod] Timeout ao esperar ECHO HIGH.") # Log verboso opcional
                 return None
 
         pulse_end_time = time.time()
@@ -67,28 +76,27 @@ def read_distance():
         while GPIO.input(config.GPIO_ECHO_PIN) == GPIO.HIGH:
             pulse_end_time = time.time()
             if pulse_end_time > timeout_limit:
-                # print("[Sensor] Timeout ao esperar ECHO LOW.") # Logar pode ser muito verboso aqui
+                # print("[Sensor Mod] Timeout ao esperar ECHO LOW.") # Log verboso opcional
                 return None
 
         pulse_duration = pulse_end_time - pulse_start_time
 
-        # Verifica duração razoável (evita valores absurdos se algo der errado)
-        # Max range ~4m -> ~23ms pulse. Min range ~2cm -> ~0.1ms pulse
+        # Verifica duração razoável (evita valores absurdos)
         if pulse_duration < 0.0001 or pulse_duration > 0.025:
-             # print(f"[Sensor] Duração do pulso fora do esperado: {pulse_duration:.5f}s")
+             # print(f"[Sensor Mod] Duração do pulso fora do esperado: {pulse_duration:.5f}s")
              return None
 
         distance = (pulse_duration * 34300) / 2 # Velocidade do som em cm/s
         return round(distance, 1)
 
     except RuntimeError as e:
-        # Este erro geralmente indica um problema mais sério com o GPIO
-        print(f"[Sensor] Erro de Runtime GPIO na leitura: {e}")
-        # Em um sistema maior, talvez sinalizar para reiniciar o setup do GPIO
-        # Por ora, apenas retornamos None para indicar falha nesta leitura
+        # !! IMPORTANTE !! NÃO chamar cleanup_gpio() aqui!
+        # Apenas reporta o erro e retorna None. O main_publisher decidirá o que fazer.
+        print(f"[Sensor Mod] Erro de Runtime GPIO na leitura: {e}")
+        # Este erro pode indicar que o setmode foi perdido, mas não podemos limpá-lo aqui.
         return None
     except Exception as e:
-        print(f"[Sensor] Erro inesperado na leitura: {e}")
+        print(f"[Sensor Mod] Erro inesperado na leitura: {e}")
         return None # Retorna None para indicar falha na leitura
 
 def get_median_distance(num_readings=NUM_READINGS_PER_CYCLE,
@@ -96,88 +104,36 @@ def get_median_distance(num_readings=NUM_READINGS_PER_CYCLE,
                         interval=READING_INTERVAL_SECONDS):
     """
     Realiza múltiplas leituras de distância e retorna a mediana.
+    Chamado pelo script principal dentro do loop.
 
     Args:
         num_readings (int): Número de leituras a serem feitas.
-        min_valid (int): Número mínimo de leituras válidas necessárias para calcular a mediana.
+        min_valid (int): Número mínimo de leituras válidas necessárias.
         interval (float): Tempo em segundos a esperar entre as leituras.
 
     Returns:
-        float | None: A mediana das leituras válidas em cm, ou None se não houver
-                      leituras válidas suficientes ou ocorrer um erro crítico.
+        float | None: A mediana das leituras válidas em cm, ou None se falhar.
     """
     readings = []
-    print(f"[Sensor] Coletando {num_readings} leituras...")
+    print(f"[Sensor Mod] Coletando {num_readings} leituras...")
     for i in range(num_readings):
-        distance = read_distance()
+        distance = read_distance() # Chama a função de leitura individual
         if distance is not None:
-            # Opcional: Adicionar validação de faixa (ex: ignorar leituras < 2cm ou > 400cm)
-            # if 2 < distance < 400:
-            #    readings.append(distance)
-            # else:
-            #    print(f"[Sensor] Leitura {i+1}/{num_readings} descartada (fora da faixa): {distance} cm")
             readings.append(distance)
-            print(f"[Sensor] Leitura {i+1}/{num_readings}: {distance:.1f} cm")
-        else:
-            print(f"[Sensor] Leitura {i+1}/{num_readings}: Falhou")
+            # print(f"[Sensor Mod] Leitura {i+1}/{num_readings}: {distance:.1f} cm") # Log verboso opcional
+        # else:
+            # print(f"[Sensor Mod] Leitura {i+1}/{num_readings}: Falhou") # Log verboso opcional
 
         # Espera um pouco entre as leituras para o sensor estabilizar
-        if i < num_readings - 1: # Não espera após a última leitura
+        if i < num_readings - 1:
              time.sleep(interval)
 
     if len(readings) >= min_valid:
         median_distance = statistics.median(readings)
-        print(f"[Sensor] Leituras válidas: {len(readings)}/{num_readings}. Mediana calculada.")
+        print(f"[Sensor Mod] Leituras válidas: {len(readings)}/{num_readings}. Mediana: {median_distance:.1f} cm.")
         return round(median_distance, 1)
     else:
-        print(f"[Sensor] Não foi possível calcular a mediana ({len(readings)}/{num_readings} leituras válidas, mínimo necessário: {min_valid}).")
+        print(f"[Sensor Mod] Não foi possível calcular a mediana ({len(readings)}/{num_readings} leituras válidas, mínimo: {min_valid}).")
         return None
 
-def cleanup_gpio():
-    """Libera os recursos GPIO utilizados."""
-    print("[Sensor] Limpando GPIO...")
-    try:
-        # Limpa apenas os pinos que configuramos
-        GPIO.cleanup((config.GPIO_TRIG_PIN, config.GPIO_ECHO_PIN))
-        print("[Sensor] GPIO limpo.")
-    except Exception as e:
-        print(f"[Sensor] Erro ao limpar GPIO: {e}")
-
-# --- Loop Principal ---
-if __name__ == "__main__":
-    if not setup_gpio():
-        sys.exit(1) # Sai se o GPIO não puder ser inicializado
-
-    try:
-        while True:
-            start_time = time.time()
-            print(f"\n--- {time.strftime('%Y-%m-%d %H:%M:%S')} --- Iniciando ciclo de medição ---")
-
-            median_value = get_median_distance()
-
-            if median_value is not None:
-                print(f"=============================================")
-                print(f" MEDIANA DA DISTÂNCIA: {median_value:.1f} cm")
-                print(f"=============================================")
-                # Aqui seria o ponto para "publicar" o valor (ex: MQTT, API, etc.)
-                # Exemplo: publish_to_mqtt(topic="sensor/distance/median", value=median_value)
-            else:
-                print("---------------------------------------------")
-                print(" Não foi possível obter a mediana neste ciclo.")
-                print("---------------------------------------------")
-
-            # Calcula quanto tempo esperar para completar o ciclo de PUBLISH_INTERVAL_SECONDS
-            end_time = time.time()
-            elapsed_time = end_time - start_time
-            sleep_time = max(0, PUBLISH_INTERVAL_SECONDS - elapsed_time)
-
-            print(f"Ciclo levou {elapsed_time:.2f}s. Aguardando {sleep_time:.2f}s para o próximo ciclo.")
-            time.sleep(sleep_time)
-
-    except KeyboardInterrupt:
-        print("\n[Main] Interrupção recebida (Ctrl+C). Encerrando...")
-    except Exception as e:
-        print(f"\n[Main] Erro inesperado no loop principal: {e}")
-    finally:
-        cleanup_gpio()
-        print("[Main] Programa finalizado.")
+# Nota: NÃO HÁ MAIS o bloco if __name__ == "__main__": aqui.
