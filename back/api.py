@@ -80,7 +80,7 @@ def connect_db():
 
 # --- Endpoints da API ---
 
-@app.get("/leitura/ultima", summary="Obter a última leitura de distância")
+@app.get("/leituras/ultima", summary="Obter a última leitura de distância")
 def get_ultima_leitura():
     """
     Busca a leitura de distância mais recente registrada no banco de dados e a retorna com o fuso horário de Recife.
@@ -126,7 +126,7 @@ def get_ultima_leitura():
     except HTTPException as http_exc:
         raise http_exc
     except (Exception, psycopg2.Error) as e:
-        print(f"API Erro em /leitura/ultima: {e}")
+        print(f"API Erro em /leituras/ultima: {e}")
         raise HTTPException(status_code=500, detail="Erro interno do servidor ao buscar última leitura")
     finally:
         if conn:
@@ -134,7 +134,7 @@ def get_ultima_leitura():
                 conn.close()
                 # print("API Conexão com DB fechada.") # Log opcional
             except psycopg2.Error as close_err:
-                print(f"API Erro ao fechar conexão DB em /leitura/ultima: {close_err}")
+                print(f"API Erro ao fechar conexão DB em /leituras/ultima: {close_err}")
 
 
 @app.get("/leituras", summary="Obter leituras de distância em um período")
