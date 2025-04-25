@@ -7,10 +7,28 @@
 
 import time
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone # timezone ainda é útil para UTC como fallback
 import sys
 import os
-# Removido: import RPi.GPIO (não é mais necessário aqui, sensor_reader gerencia)
+try:
+    # Importa ZoneInfo para lidar com fusos horários específicos
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+except ImportError:
+    # Fallback para pytz se zoneinfo não estiver disponível (Python < 3.9)
+    # Nesse caso, você precisaria instalar: pip install pytz
+    try:
+        import pytz
+        print("Aviso: Módulo zoneinfo não encontrado (Python < 3.9?). Usando pytz como alternativa.")
+        # Define uma função compatível para obter o objeto de timezone
+        def get_zoneinfo(tz_name):
+            return pytz.timezone(tz_name)
+        ZoneInfoNotFoundError = pytz.exceptions.UnknownTimeZoneError # Define a exceção compatível
+    except ImportError:
+        print("ERRO: Nem zoneinfo nem pytz foram encontrados. Timestamps usarão UTC.")
+        # Define funções dummy para não quebrar o código, mas usará UTC
+        def get_zoneinfo(tz_name): return timezone.utc
+        class ZoneInfoNotFoundError(Exception): pass
+
 
 # Módulos locais do projeto
 try:
@@ -25,18 +43,39 @@ except Exception as e:
     print(f"Erro inesperado durante a importação: {e}")
     sys.exit(1)
 
+# --- Constante para o fuso horário desejado ---
+TARGET_TIMEZONE = "America/Recife"
+
 def run_publisher_with_sensor():
     """Função principal para executar o ciclo de leitura da MEDIANA do sensor e publicação via MQTT."""
-    print("--- Iniciando Aplicação Publisher (com Leitura de Mediana do Sensor) ---")
+    print(f"--- Iniciando Aplicação Publisher (Fuso Horário: {TARGET_TIMEZONE}) ---")
     publisher = None # Inicializa publisher como None para o finally
+    recife_tz = None # Inicializa o objeto de timezone
+
+    # --- Tenta carregar o fuso horário ---
+    try:
+        # Usa ZoneInfo (Python >= 3.9) ou a função de fallback get_zoneinfo (pytz)
+        if 'ZoneInfo' in globals(): # Verifica se ZoneInfo foi importado com sucesso
+            recife_tz = ZoneInfo(TARGET_TIMEZONE)
+        else: # Usa a função get_zoneinfo (que pode ser pytz ou um fallback UTC)
+             recife_tz = get_zoneinfo(TARGET_TIMEZONE)
+        print(f"Fuso horário '{TARGET_TIMEZONE}' carregado com sucesso.")
+    except ZoneInfoNotFoundError:
+        print(f"ERRO: Fuso horário '{TARGET_TIMEZONE}' não encontrado.")
+        print("Verifique se o pacote 'tzdata' está instalado (sudo apt install tzdata).")
+        print("Usando UTC como fallback para timestamps.")
+        recife_tz = timezone.utc # Define UTC como fallback
+    except Exception as tz_err:
+         print(f"ERRO inesperado ao carregar fuso horário: {tz_err}")
+         print("Usando UTC como fallback para timestamps.")
+         recife_tz = timezone.utc # Define UTC como fallback
+
 
     # --- PASSO NOVO: Inicializar GPIO ---
-    # É crucial chamar setup_gpio ANTES de qualquer tentativa de leitura
     print("Inicializando GPIO via sensor_reader...")
     if not sensor_reader.setup_gpio():
         print("ERRO CRÍTICO: Falha ao inicializar GPIO. Encerrando.")
-        # Não precisa chamar cleanup aqui, pois o setup falhou.
-        return # Sai da função
+        return
 
     try:
         # 1. Cria instância do Publicador MQTT
@@ -46,56 +85,56 @@ def run_publisher_with_sensor():
         # 2. Tenta conectar ao Broker MQTT
         if not publisher.connect():
             print("Falha ao iniciar a conexão com o broker MQTT. Encerrando.")
-            # Cleanup do GPIO é necessário aqui, pois o setup foi bem-sucedido
             sensor_reader.cleanup_gpio()
-            return # Sai da função
+            return
 
-        # 3. Pausa para aguardar a conexão inicial (mantido do original)
+        # 3. Pausa para aguardar a conexão inicial
         print("Aguardando alguns segundos para a conexão inicial com o broker MQTT...")
         time.sleep(5)
 
-        # Verifica se a conexão foi estabelecida após a pausa (mantido do original)
+        # Verifica se a conexão foi estabelecida após a pausa
         if not publisher.is_connected:
              print("Não foi possível confirmar a conexão MQTT após a espera. Encerrando.")
              publisher.disconnect()
-             sensor_reader.cleanup_gpio() # Garante a limpeza do GPIO
-             return # Sai da função
+             sensor_reader.cleanup_gpio()
+             return
 
         # 4. Loop Principal de Leitura (Mediana) e Publicação
         print("\n--- Iniciando Loop de Leitura da Mediana e Publicação (Ctrl+C para parar) ---")
         while True:
-            #cycle_start_time = time.time() # Marca o início do ciclo
+            cycle_start_time = time.time()
 
-            # --- MODIFICADO: Lê a MEDIANA da distância ---
-            # Em vez de read_distance(), chamamos get_median_distance()
+            # Lê a MEDIANA da distância
             median_distance_value = sensor_reader.get_median_distance()
 
-            #if median_distance_value is not None:
+            if median_distance_value is not None:
                 # Validação básica da MEDIANA lida
-                # A faixa de validação pode ser a mesma ou ajustada se necessário
-                #if 5 < median_distance_value < 400:
-            print(f"Mediana do sensor: {median_distance_value:.1f} cm (Válida)")
-                    # Cria o payload (dados a serem enviados)
-            payload_dict = {
-                        # Usar a mediana aqui
-                    "distancia": round(median_distance_value),
-                    "created_on": datetime.now(timezone.utc).isoformat()
+                if 5 < median_distance_value < 400:
+                    print(f"Mediana do sensor: {median_distance_value:.1f} cm (Válida)")
+
+                    # --- MODIFICADO: Gera timestamp no fuso horário correto ---
+                    timestamp_now_local = datetime.now(recife_tz) # Usa o objeto de timezone carregado
+                    timestamp_iso_local = timestamp_now_local.isoformat() # Gera string ISO com offset correto
+
+                    # Cria o payload
+                    payload_dict = {
+                        "distancia": round(median_distance_value),
+                        "created_on": timestamp_iso_local # Usa o timestamp local formatado
                     }
                     # Publica os dados formatados como JSON
-            publisher.publish_data(payload_dict)
-                #else:
-                    #print(f"Mediana do sensor: {median_distance_value:.1f} cm (Fora da faixa esperada, ignorando)")
-            #else:
-                # A função get_median_distance já imprime mensagens de erro internas
-                #print("[Publisher Main] Falha ao obter a mediana do sensor. Pulando a publicação.")
+                    publisher.publish_data(payload_dict)
+                else:
+                    print(f"Mediana do sensor: {median_distance_value:.1f} cm (Fora da faixa esperada, ignorando)")
+            else:
+                print("[Publisher Main] Falha ao obter a mediana do sensor. Pulando a publicação.")
 
-            # --- MODIFICADO: Cálculo preciso do tempo de espera ---
-            #cycle_end_time = time.time()
-            #elapsed_time = cycle_end_time - cycle_start_time
-            #sleep_time = max(0, config.PUBLISH_INTERVAL_SECONDS - elapsed_time)
+            # Cálculo preciso do tempo de espera
+            cycle_end_time = time.time()
+            elapsed_time = cycle_end_time - cycle_start_time
+            sleep_time = max(0, config.PUBLISH_INTERVAL_SECONDS - elapsed_time)
 
-            #print(f"Ciclo levou {elapsed_time:.2f}s. Aguardando {sleep_time:.2f}s para o próximo...")
-            time.sleep(config.PUBLISH_INTERVAL_SECONDS) # Espera o tempo restante para completar o intervalo
+            print(f"Ciclo levou {elapsed_time:.2f}s. Aguardando {sleep_time:.2f}s para o próximo...")
+            time.sleep(sleep_time)
 
     except KeyboardInterrupt:
         print("\nInterrupção pelo usuário (Ctrl+C) recebida. Encerrando o publisher...")
@@ -104,19 +143,15 @@ def run_publisher_with_sensor():
         import traceback
         traceback.print_exc()
     finally:
-        # Bloco finally garante que a limpeza será executada
         print("Encerrando a aplicação publisher...")
-        # Desconecta do broker MQTT
-        if publisher and publisher.is_connected: # Verifica se está conectado antes de desconectar
+        if publisher and publisher.is_connected:
             print("Desconectando do MQTT Broker...")
             publisher.disconnect()
         else:
             print("Publisher MQTT não conectado ou não inicializado.")
 
-        # Limpa os pinos GPIO utilizados pelo sensor SEMPRE no final
-        # A função cleanup_gpio agora está dentro do sensor_reader
         print("Limpando os pinos GPIO...")
-        sensor_reader.cleanup_gpio() # Chama a função de limpeza do módulo sensor_reader
+        sensor_reader.cleanup_gpio()
         print("Aplicação publisher finalizada.")
 
 # Ponto de entrada do script
