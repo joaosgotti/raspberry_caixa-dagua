@@ -1,79 +1,172 @@
 // src/App.jsx
 import { useState, useEffect } from 'react';
-// Você pode remover as importações de logo.svg e App.css se não for usar.
+import './App.css'; // Importe o arquivo CSS
+
+// *** IMPORTAR BIBLIOTECA DE GRÁFICOS AQUI ***
+// Exemplo (depois de instalar):
+// import { Line } from 'react-chartjs-2';
+// import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+// ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+
 
 function App() {
-  // Estado para armazenar os dados recebidos do back-end
-  const [statusData, setStatusData] = useState(null);
-  // Estado para controlar se está carregando
-  const [isLoading, setIsLoading] = useState(true);
-  // Estado para armazenar erros
-  const [error, setError] = useState(null);
+  // Estados para os dados
+  const [latestReading, setLatestReading] = useState(null);
+  const [allReadings, setAllReadings] = useState([]); // Estado para todas as leituras (para o gráfico)
 
-  // URL do seu back-end.
-  // Se estiver desenvolvendo localmente e o back-end rodar em localhost:8000,
-  // e o front-end em localhost:5173 (padrão do Vite),
-  // use a URL completa ou configure um proxy no Vite (mais avançado).
-  // Para deploy, use a URL pública do seu back-end.
-  const BACKEND_URL = '/status'; // Exemplo: 'https://seu-backend-aqui.render.com/status'
+  // URLs dos seus endpoints
+  const LATEST_READING_URL = 'https://projeto-caixa-dagua-api.onrender.com/leituras/ultima';
+  // URL para todas as leituras (ajuste se precisar passar um parâmetro para 24h)
+  const ALL_READINGS_URL = 'https://projeto-caixa-dagua-api.onrender.com/leituras'; // Assumindo que retorna uma lista, talvez grande
 
-  // Função para buscar os dados do back-end
-  const fetchStatus = async () => {
-    setIsLoading(true);
-    setError(null); // Limpa erros anteriores
+  // Função para buscar dados (agora busca última e todas as leituras)
+  const fetchData = async () => {
     try {
-      const response = await fetch(BACKEND_URL);
-
-      if (!response.ok) {
-        // Lança um erro se a resposta HTTP não for 2xx
-        throw new Error(`Erro HTTP! Status: ${response.status}`);
+      // Busca a última leitura
+      const latestResponse = await fetch(LATEST_READING_URL);
+      if (latestResponse.ok) {
+        const latestData = await latestResponse.json();
+        setLatestReading(latestData);
+      } else {
+         console.error(`Erro HTTP ao buscar última leitura! Status: ${latestResponse.status}`);
       }
 
-      const data = await response.json();
-      setStatusData(data); // Atualiza o estado com os dados recebidos
+      // Busca todas as leituras (para o gráfico)
+      const allResponse = await fetch(ALL_READINGS_URL);
+      if (allResponse.ok) {
+         const allData = await allResponse.json();
+         // *** AQUI: Você pode filtrar allData para as últimas 24h SE o backend retornar mais do que isso ***
+         // Exemplo conceitual (requer lógica de data):
+         // const last24HoursData = allData.filter(item => isWithinLast24Hours(item.created_on));
+         // setAllReadings(last24HoursData);
+         // Por enquanto, apenas armazena todos os dados recebidos:
+         setAllReadings(allData);
+
+      } else {
+          console.error(`Erro HTTP ao buscar todas as leituras! Status: ${allResponse.status}`);
+       }
 
     } catch (err) {
-      console.error("Erro ao buscar status:", err);
-      setError(err); // Armazena o erro no estado
-    } finally {
-      setIsLoading(false); // Finaliza o estado de carregamento
+      console.error("Erro ao buscar dados:", err);
     }
   };
 
-  // useEffect para buscar os dados quando o componente monta (apenas uma vez)
+  // useEffect para buscar dados na montagem
   useEffect(() => {
-    fetchStatus();
-  }, []); // Array de dependências vazio significa que executa apenas uma vez
+    fetchData();
+    // Opcional: buscar dados periodicamente (a cada 60 segundos, por exemplo)
+    // const intervalId = setInterval(fetchData, 60000);
+    // return () => clearInterval(intervalId); // Limpa o intervalo na desmontagem
+  }, []);
 
-  // Função para formatar a exibição dos dados (adapte conforme seu JSON)
-  const renderStatus = () => {
-      if (!statusData) return <p>Nenhum dado disponível.</p>;
-
-      // Assumindo que seu JSON tem chaves como: nivel_agua, status_bomba, timestamp
-      // Adapte conforme o JSON real do seu back-end
-      return (
-        <div>
-          <p><strong>Nível da Água:</strong> {statusData.nivel_agua || 'N/A'}</p>
-          <p><strong>Status da Bomba:</strong> {statusData.status_bomba || 'N/A'}</p>
-          <p><strong>Última Atualização:</strong> {statusData.timestamp ? new Date(statusData.timestamp).toLocaleString() : 'N/A'}</p>
-           <p><em>(Adapte a exibição acima conforme as chaves do seu JSON)</em></p>
-        </div>
-      );
+  // Função para formatar a data/hora
+   const formatTimestamp = (timestampString) => {
+      if (!timestampString) return 'N/A';
+      try {
+          const date = new Date(timestampString);
+          if (isNaN(date.getTime())) {
+              throw new Error("Data inválida");
+          }
+          return date.toLocaleString();
+      } catch (e) {
+          console.error("Erro ao formatar timestamp:", timestampString, e);
+          return timestampString;
+      }
   };
 
-  return (
-    <div>
-      <h1>Status da Caixa D'água (React)</h1>
+  // *** PREPARAR DADOS PARA O GRÁFICO AQUI ***
+  // Esta lógica dependerá da biblioteca de gráficos e do formato exato de allReadings
+  // Exemplo conceitual para Chart.js:
+  const chartData = {
+      labels: allReadings.map(item => formatTimestamp(item.created_on)), // Eixos X (tempo)
+      datasets: [
+          {
+              label: 'Distância (cm)',
+              data: allReadings.map(item => item.distancia), // Eixo Y (valor)
+              fill: false,
+              backgroundColor: 'rgba(75,192,192,0.2)',
+              borderColor: 'rgba(75,192,192,1)',
+          },
+      ],
+  };
 
-      <div style={{ marginTop: '20px', border: '1px solid #ccc', padding: '15px', minHeight: '80px' }}>
-        {isLoading && <p>Carregando status...</p>}
-        {error && <p style={{ color: 'red' }}>Erro: {error.message}</p>}
-        {!isLoading && !error && renderStatus()}
+  // Opções do gráfico (exemplo Chart.js)
+  const chartOptions = {
+      responsive: true,
+      plugins: {
+          title: {
+              display: true,
+              text: 'Leituras das Últimas 24h', // Título do gráfico
+              color: var('--primary-blue-light'), // Use a string for the CSS variable
+          },
+      },
+      scales: {
+          x: { // Eixo X (tempo)
+            // type: 'time', // Pode ser necessário configurar tipo time scale dependendo da lib e formato data
+            title: { display: true, text: 'Horário', color: var('--text-medium') },
+            ticks: { color: var('--text-dark') },
+            grid: { color: var('--border-color') },
+          },
+          y: { // Eixo Y (distância)
+            title: { display: true, text: 'Distância (cm)', color: var('--text-medium') },
+            ticks: { color: var('--text-dark') },
+            grid: { color: var('--border-color') },
+          }
+      },
+       maintainAspectRatio: false, // Permite controlar o tamanho pelo container
+  };
+
+
+  return (
+    <div className="app-container"> {/* Container Flexbox principal */}
+
+      {/* Título principal acima das colunas */}
+      <h1>Leituras da Caixa D'água</h1>
+
+      {/* Coluna 1: Última Leitura e Info Usuário (1/3) */}
+      <div className="column part-1">
+          <h2>Última Leitura</h2>
+          <div className="reading-container">
+              {latestReading ? (
+                  <div>
+                      <p><strong>ID:</strong> {latestReading.id || 'N/A'}</p>
+                      {/* Ajuste a label para refletir que é distância, que geralmente é inversamente proporcional ao nível */}
+                      <p><strong>Distância (Nível):</strong> {latestReading.distancia !== undefined ? `${latestReading.distancia} cm` : 'N/A'}</p>
+                      <p><strong>Horário:</strong> {formatTimestamp(latestReading.created_on)}</p>
+                  </div>
+              ) : (
+                  <p className="loading-text">Aguardando última leitura...</p>
+              )}
+          </div>
+
+          {/* Informações do Usuário */}
+          <div className="user-info">
+              {/* Substitua 'sua-foto.jpg' pelo caminho da sua foto */}
+              {/* Crie uma pasta 'public' na raiz do projeto e coloque a foto lá, ex: /public/minha-foto.jpg --> src="/minha-foto.jpg" */}
+              <img src="/caminho-para-sua-foto.jpg" alt="Sua Foto" />
+              <p>Seu Nome Completo</p> {/* Substitua pelo seu nome */}
+              {/* Adicione outras informações se quiser */}
+          </div>
       </div>
 
-      <button onClick={fetchStatus} disabled={isLoading} style={{ marginTop: '10px', padding: '10px 20px', cursor: 'pointer' }}>
-        {isLoading ? 'Atualizando...' : 'Atualizar Status'}
-      </button>
+      {/* Coluna 2: Gráfico (2/3) */}
+      <div className="column part-2">
+          <h2>Gráfico das Últimas Leituras</h2>
+          <div className="graph-container">
+              {/* *** ÁREA DO GRÁFICO *** */}
+              {allReadings.length > 0 ? (
+                  // *** RENDERIZAR O COMPONENTE DO GRÁFICO AQUI ***
+                  // Exemplo para react-chartjs-2:
+                  // <Line data={chartData} options={chartOptions} />
+                  <p>Placeholder do Gráfico - Implementação necessária</p> // Placeholder atual
+              ) : (
+                  <p className="loading-text">Aguardando dados para o gráfico...</p>
+              )}
+               {/* Mensagem explicando a necessidade da biblioteca */}
+               {!allReadings.length && !latestReading && <p className="comment">O gráfico requer dados históricos e uma biblioteca de gráficos (ex: Chart.js + react-chartjs-2).</p>}
+          </div>
+      </div>
+
     </div>
   );
 }
