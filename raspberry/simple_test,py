@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# simple_listener_test.py
+# Um script procedural MUITO simples para testar a conexão MQTT e recebimento de mensagens.
+
+import paho.mqtt.client as mqtt
+import ssl
+import time
+import os
+import sys
+from dotenv import load_dotenv
+
+print("--- Iniciando Teste MQTT Procedural Simples ---")
+
+# --- 1. Carregar Configuração do .env ---
+print("Carregando configuração do arquivo .env...")
+load_dotenv()
+
+MQTT_BROKER = os.getenv("MQTT_BROKER")
+MQTT_PORT_STR = os.getenv("MQTT_PORT", "8883") # Pega como string, padrão 8883
+MQTT_USER = os.getenv("MQTT_USER")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
+MQTT_TOPIC = os.getenv("MQTT_TOPIC")
+
+# Validação básica da configuração
+if not all([MQTT_BROKER, MQTT_PORT_STR, MQTT_USER, MQTT_PASSWORD, MQTT_TOPIC]):
+    print("ERRO CRÍTICO: Variáveis MQTT_BROKER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, MQTT_TOPIC devem estar definidas no .env!")
+    sys.exit(1)
+
+try:
+    MQTT_PORT = int(MQTT_PORT_STR)
+except ValueError:
+    print(f"ERRO CRÍTICO: MQTT_PORT ('{MQTT_PORT_STR}') no .env não é um número válido!")
+    sys.exit(1)
+
+print(f"Configuração carregada:")
+print(f"  Broker: {MQTT_BROKER}:{MQTT_PORT}")
+print(f"  Tópico: {MQTT_TOPIC}")
+print(f"  Usuário: {MQTT_USER}")
+
+# --- 2. Definir Funções de Callback ---
+def on_connect(client, userdata, flags, rc, properties=None):
+    """Callback para quando a conexão é estabelecida (ou falha)."""
+    connect_result_str = mqtt.connack_string(rc)
+    print(f"[Callback on_connect] Resultado da Conexão: {rc} - {connect_result_str}")
+    if rc == 0:
+        print(f"[Callback on_connect] Conectado com sucesso! Inscrevendo no tópico '{MQTT_TOPIC}'...")
+        # Inscreve no tópico APÓS conectar com sucesso
+        # Usar QoS 1 é uma boa prática para garantir que a inscrição chegue
+        subscribe_result, mid = client.subscribe(MQTT_TOPIC, qos=1)
+        if subscribe_result == mqtt.MQTT_ERR_SUCCESS:
+            print(f"[Callback on_connect] Inscrição enviada com sucesso (MID: {mid}).")
+        else:
+            print(f"[Callback on_connect] ERRO ao tentar inscrever: {mqtt.error_string(subscribe_result)}")
+    else:
+        print("[Callback on_connect] Falha na conexão. Verifique rede, credenciais, TLS.")
+        # loop_forever tentará reconectar se possível (exceto erros de auth)
+
+def on_disconnect(client, userdata, rc, properties=None):
+    """Callback para quando a conexão é perdida."""
+    print(f"[Callback on_disconnect] Desconectado com código: {rc} - {mqtt.error_string(rc)}")
+    if rc != 0:
+        print("[Callback on_disconnect] Desconexão inesperada. Tentando reconectar...")
+
+def on_message(client, userdata, msg):
+    """Callback para quando uma mensagem é recebida."""
+    try:
+        payload_str = msg.payload.decode('utf-8')
+        print(f"[Callback on_message] Mensagem Recebida! Tópico='{msg.topic}', QoS={msg.qos}, Payload='{payload_str}'")
+    except Exception as e:
+        print(f"[Callback on_message] Erro ao processar mensagem: {e}")
+        print(f"  Payload Raw (bytes): {msg.payload}")
+
+def on_subscribe(client, userdata, mid, granted_qos, properties=None):
+    """Callback para confirmação de inscrição."""
+    print(f"[Callback on_subscribe] Inscrito com sucesso (MID: {mid}) QoS Concedido: {granted_qos}")
+
+def on_log(client, userdata, level, buf):
+    """Callback para logs internos do Paho (para debug)."""
+    # Você pode comentar esta linha se ficar muito verboso, mas é útil para ver PINGs
+    print(f"[PAHO LOG | Lvl:{level}] {buf}")
+
+# --- 3. Criar e Configurar Cliente MQTT ---
+client_id = f"simple_listener_pi_{os.getpid()}"
+print(f"Criando cliente MQTT com ID: {client_id}")
+# Usar clean_session=True (padrão) para garantir que a inscrição seja feita via on_connect
+client = mqtt.Client(client_id=client_id, protocol=mqtt.MQTTv311) # clean_session=True é o padrão
+
+# Atribuir callbacks
+client.on_connect = on_connect
+client.on_disconnect = on_disconnect
+client.on_message = on_message
+client.on_subscribe = on_subscribe
+client.on_log = on_log # Ativa o log detalhado
+
+# Configurar autenticação e TLS
+print("Configurando autenticação e TLS...")
+client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
+if MQTT_PORT == 8883:
+    print("Habilitando TLS...")
+    client.tls_set(tls_version=ssl.PROTOCOL_TLSv1_2)
+else:
+    print("TLS não habilitado (porta diferente de 8883).")
+
+# --- 4. Conectar e Iniciar Loop ---
+try:
+    print(f"Tentando conectar ao broker {MQTT_BROKER}:{MQTT_PORT}...")
+    # Conecta ao broker. O Paho lida com a rede em background no loop_forever.
+    client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60) # Keepalive de 60 segundos
+
+    print("Conexão iniciada. Iniciando loop principal (loop_forever)...")
+    print("Pressione Ctrl+C para sair.")
+    # loop_forever() é bloqueante. Ele roda o loop de rede, processa callbacks
+    # e tenta reconectar automaticamente em caso de desconexão (se não for erro fatal).
+    client.loop_forever()
+
+except KeyboardInterrupt:
+    print("\nInterrupção pelo usuário recebida.")
+except ssl.SSLError as e:
+    print(f"\nERRO SSL durante conexão/loop: {e}")
+    print("Verifique a configuração TLS, certificados CA do sistema, ou compatibilidade.")
+except OSError as e:
+     print(f"\nERRO DE REDE/OS durante conexão/loop: {e}")
+     print("Verifique conectividade, DNS, firewall.")
+except Exception as e:
+    # Captura outros erros inesperados durante connect ou loop
+    print(f"\nERRO INESPERADO: {e}")
+    import traceback
+    traceback.print_exc()
+finally:
+    # Garante a desconexão ao sair
+    print("Limpando e desconectando...")
+    client.disconnect()
+    print("Cliente MQTT desconectado.")
+
+print("--- Fim do Teste MQTT Procedural Simples ---")
