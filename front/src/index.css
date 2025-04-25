@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" /> {/* Pode remover */}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Projeto Caixa D'água - Status</title> {/* Altere o título */}
+  </head>
+  <body>
+    <div id="root"></div> {/* É aqui que o React renderiza */}
+    <script type="module" src="/src/main.jsx"></script> {/* Script do Vite */}
+  </body>
+</html>
