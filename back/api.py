@@ -16,8 +16,8 @@ load_dotenv() # Ainda necessário para as variáveis do banco de dados
 # --- CONFIGURAÇÕES FIXAS DE NÍVEL ---
 # Define os valores mínimo e máximo diretamente no código.
 # Usar float (com .0) é uma boa prática para cálculos que envolvem divisão.
-MIN_NIVEL_VALUE = os.getenv("MIN_NIVEL",11)
-MAX_NIVEL_VALUE = os.getenv("MAX_NIVEL",53)
+MIN_NIVEL_VALUE = int(os.getenv("MIN_NIVEL",11))
+MAX_NIVEL_VALUE = int(os.getenv("MAX_NIVEL",53))
 
 # Validação simples para garantir que max > min ao iniciar
 if MAX_NIVEL_VALUE <= MIN_NIVEL_VALUE:
