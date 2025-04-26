@@ -116,12 +116,25 @@ def get_ultima_leitura():
             # Converte o datetime original (que deve ser aware e em UTC) para o fuso de Recife
             local_datetime = original_datetime.astimezone(local_timezone)
 
-            # Atualiza o dicionário com o timestamp formatado em ISO e com o offset correto
+            # Atualiza o dicionário com o timestamp formatado em ISO e com o offset correto ##############
+        # ... (código de conversão de timezone aqui) ...
             result['created_on'] = local_datetime.isoformat()
-            return result
+
+        # --- ADICIONADO: Cálculo do Nível (SOMENTE para a última leitura) ---
+            distancia_original = result.get('distancia') # Pega a distância que veio do DB
+            if isinstance(distancia_original, (int, float)): # Verifica se é um número
+            # Se for número, calcula o nível e adiciona ao dicionário 'result'
+                result['nivel'] = round(distancia_original * 3, 1)
+            else:
+            # Se não for número (ou for None), adiciona 'nivel' como None
+                result['nivel'] = None
+        # --- FIM DA ADIÇÃO ---
+
+            return result # Agora retorna o 'result' com o novo campo 'nivel'
         else:
-            # Nenhuma leitura encontrada
+        # Nenhuma leitura encontrada
             return {}
+        ##########################
 
     except HTTPException as http_exc:
         raise http_exc
