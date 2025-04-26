@@ -17,8 +17,8 @@ load_dotenv()
 # Define valores padrão NUMÉRICOS (float para flexibilidade)
 
 # Tenta ler e converter MIN_NIVEL
-MIN_NIVEL_VALUE = int(os.getenv("MIN_NIVEL"))
-MAX_NIVEL_VALUE = int(os.getenv("MAX_NIVEL"))
+MIN_NIVEL_VALUE = int(11)
+MAX_NIVEL_VALUE = int(777)
 
 # --- Configuração da Aplicação FastAPI ---
 app = FastAPI(
