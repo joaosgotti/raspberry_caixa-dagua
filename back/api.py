@@ -101,6 +101,8 @@ def get_ultima_leitura():
 
         # Verifica se um resultado foi encontrado
         if result:
+            min_nivel = os.getenv("MIN_NIVEL") 
+            max_nivel = os.getenv("MAX_NIVEL")
             # 1. Processa o Timestamp para o fuso horário de Recife
             original_datetime = result['created_on']
             # Garante que o datetime seja 'aware' (tenha fuso horário), assumindo UTC se for 'naive'
@@ -117,7 +119,7 @@ def get_ultima_leitura():
             # 2. Calcula e Adiciona o campo 'nivel' ao dicionário
             distancia_original = result.get('distancia') # Pega o valor da distância do resultado do DB
             if isinstance(distancia_original, (int, float)): # Verifica se a distância é um número válido
-                nivel_calculado = distancia_original * 3  # Calcula o nível multiplicando por 3
+                nivel_calculado = (((distancia_original-min_nivel)/max_nivel)*100)  # Calcula o nível multiplicando por 3
                 result['nivel'] = round(nivel_calculado, 1) # Adiciona o campo 'nivel' arredondado ao dicionário
             else:
                 # Se a distância não for um número (ou for None), define 'nivel' como None
