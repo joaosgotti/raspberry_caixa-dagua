@@ -10,15 +10,21 @@ import os
 from dotenv import load_dotenv
 import pytz
 
-# --- Carregamento de Variáveis de Ambiente ---
-load_dotenv()
+# --- Carregamento de Variáveis de Ambiente (Apenas para DB) ---
+load_dotenv() # Ainda necessário para as variáveis do banco de dados
 
-# --- LEITURA DAS CONFIGURAÇÕES DE NÍVEL (DO .ENV) ---
-# Define valores padrão NUMÉRICOS (float para flexibilidade)
+# --- CONFIGURAÇÕES FIXAS DE NÍVEL ---
+# Define os valores mínimo e máximo diretamente no código.
+# Usar float (com .0) é uma boa prática para cálculos que envolvem divisão.
+MIN_NIVEL_VALUE = os.getenv("MIN_NIVEL")
+MAX_NIVEL_VALUE = os.getenv("MAX_NIVEL")
 
-# Tenta ler e converter MIN_NIVEL
-MIN_NIVEL_VALUE = int(11)
-MAX_NIVEL_VALUE = int(777)
+# Validação simples para garantir que max > min ao iniciar
+if MAX_NIVEL_VALUE <= MIN_NIVEL_VALUE:
+    print(f"--- ERRO DE CONFIGURAÇÃO FIXA: MAX_NIVEL ({MAX_NIVEL_VALUE}) deve ser maior que MIN_NIVEL ({MIN_NIVEL_VALUE}) ---")
+    # Em um caso real, você poderia querer parar a aplicação aqui:
+    # import sys
+    # sys.exit(1)
 
 # --- Configuração da Aplicação FastAPI ---
 app = FastAPI(
@@ -37,8 +43,10 @@ app.add_middleware(
 )
 
 # --- Função de Conexão com o Banco de Dados ---
-# (Função connect_db permanece exatamente igual a antes)
 def connect_db():
+    """
+    Estabelece uma conexão com o banco de dados PostgreSQL usando credenciais de variáveis de ambiente.
+    """
     db_name = os.getenv("DB_NAME")
     db_user = os.getenv("DB_USER")
     db_password = os.getenv("DB_PASSWORD")
@@ -62,7 +70,7 @@ def connect_db():
 def get_ultima_leitura():
     """
     Busca a leitura de distância mais recente, calcula o 'nivel' (como porcentagem)
-    usando MIN_NIVEL e MAX_NIVEL configurados, e retorna com fuso de Recife.
+    usando os valores fixos MIN_NIVEL_VALUE e MAX_NIVEL_VALUE, e retorna com fuso de Recife.
     """
     conn = None
     try:
@@ -84,27 +92,32 @@ def get_ultima_leitura():
             local_datetime = original_datetime.astimezone(local_timezone)
             result['created_on'] = local_datetime.isoformat()
 
-            # 2. Calcula e Adiciona o Nível (USANDO AS VARIÁVEIS NUMÉRICAS CONVERTIDAS)
+            # 2. Calcula e Adiciona o Nível (usando valores fixos)
             distancia_original = result.get('distancia')
             if isinstance(distancia_original, (int, float)):
-                 # Calcula a diferença normalizada (0 a 1 ou mais)
-                 # Garante que max - min não seja zero
-                 range_nivel = MAX_NIVEL_VALUE - MIN_NIVEL_VALUE
-                 if range_nivel == 0:
-                      print("API Erro: MIN_NIVEL e MAX_NIVEL são iguais, impossível calcular porcentagem.")
-                      nivel_percentual = 0 # Ou algum valor de erro
-                 else:
-                      nivel_normalizado = (distancia_original - MIN_NIVEL_VALUE) / range_nivel
-                      # Converte para porcentagem e limita entre 0 e 100
-                      nivel_percentual = max(0, min(100, nivel_normalizado * 100))
+                # Calcula o tamanho total do intervalo válido
+                range_nivel = MAX_NIVEL_VALUE - MIN_NIVEL_VALUE
 
-                 result['nivel'] = round(nivel_percentual, 1) # Salva como porcentagem
+                # Verifica se o intervalo é válido (evita divisão por zero)
+                if range_nivel == 0:
+                    print("API Aviso: MIN_NIVEL_VALUE e MAX_NIVEL_VALUE são iguais. Nível definido como 0%.")
+                    nivel_percentual = 0.0
+                else:
+                    # Calcula onde a distância atual se encontra dentro do intervalo (valor entre 0 e 1 geralmente)
+                    nivel_normalizado = (distancia_original - MIN_NIVEL_VALUE) / range_nivel
+                    # Converte para porcentagem e garante que fique entre 0 e 100
+                    nivel_percentual = max(0.0, min(100.0, nivel_normalizado * 100.0))
+
+                # Adiciona o nível calculado (como porcentagem) ao resultado
+                result['nivel'] = round(nivel_percentual, 1)
             else:
+                # Se a distância não for um número, o nível também não pode ser calculado
                 result['nivel'] = None
 
             # 3. Retorna o dicionário completo
             return result
         else:
+            # Se nenhuma leitura for encontrada
             return {}
 
     except HTTPException as http_exc:
