@@ -104,7 +104,7 @@ def get_ultima_leitura():
                     nivel_percentual = 0.0
                 else:
                     # Calcula onde a distância atual se encontra dentro do intervalo (valor entre 0 e 1 geralmente)
-                    nivel_normalizado = (distancia_original - MIN_NIVEL_VALUE) / range_nivel
+                    nivel_normalizado = 1-((distancia_original - MIN_NIVEL_VALUE) / range_nivel)
                     # Converte para porcentagem e garante que fique entre 0 e 100
                     nivel_percentual = max(0.0, min(100.0, nivel_normalizado * 100.0))
 
