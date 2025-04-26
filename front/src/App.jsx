@@ -24,6 +24,8 @@ const LoadingSpinner = () => (
 
 // Defina o intervalo de polling em milissegundos
 const POLLING_INTERVAL_MS = 15000;
+const altura_minima_caixa_vazia = 11
+const altura_maxima_caixa_cheia = 56 // Defina a altura máxima da caixa d'água (em cm)
 
 function App() {
   const [ultimaLeitura, setUltimaLeitura] = useState(null);
@@ -184,6 +186,8 @@ function App() {
                 ) : ultimaLeitura ? (
                   <div className="text-slate-300 space-y-3 text-base sm:text-lg text-center sm:text-left">
                     <p><span className="font-medium text-slate-100">Nível:</span>{' '}{typeof ultimaLeitura.distancia === 'number' ? `${ultimaLeitura.distancia.toFixed(1)} cm` : 'Indisponível'}</p>
+                    <p>
+                    <span className="font-medium text-slate-100">Porcentagem:</span>{' '}{typeof ultimaLeitura.distancia === 'number' ? `${(((ultimaLeitura.distancia - altura_minima_caixa_vazia) / altura_maxima_caixa_cheia) * 100).toFixed(0)}%` : 'Indisponível'}</p>
                     <p><span className="font-medium text-slate-100">Data:</span>{' '}{formatUltimaLeituraTimestamp(ultimaLeitura.timestamp || ultimaLeitura.created_on)}</p>
                   </div>
                 ) : !erro ? (
@@ -193,7 +197,7 @@ function App() {
             </div>
 
             {/* Bloco de Perfil */}
-            <div className="bg-slate-800 rounded-xl shadow-lg p-12 transition-shadow hover:shadow-xl border border-slate-700 flex items-center gap-4">
+            <div className="bg-slate-800 rounded-xl shadow-lg p-6 transition-shadow hover:shadow-xl border border-slate-700 flex items-center gap-4">
               <img
                 src="/jvsv.jpg" // Certifique-se que está na pasta /public
                 alt="Foto de João Vitor"
