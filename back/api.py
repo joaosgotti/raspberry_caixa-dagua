@@ -15,38 +15,10 @@ load_dotenv()
 
 # --- LEITURA DAS CONFIGURAÇÕES DE NÍVEL (DO .ENV) ---
 # Define valores padrão NUMÉRICOS (float para flexibilidade)
-DEFAULT_MIN_NIVEL = 11.0
-DEFAULT_MAX_NIVEL = 53.0
 
 # Tenta ler e converter MIN_NIVEL
-min_nivel_str = os.getenv("MIN_NIVEL")
-if min_nivel_str is not None:
-    try:
-        MIN_NIVEL_VALUE = float(min_nivel_str)
-        print(f"API Info: Usando MIN_NIVEL do .env: {MIN_NIVEL_VALUE}")
-    except ValueError:
-        print(f"API Erro: Valor inválido para MIN_NIVEL ('{min_nivel_str}') no .env. Usando padrão: {DEFAULT_MIN_NIVEL}")
-        MIN_NIVEL_VALUE = DEFAULT_MIN_NIVEL
-else:
-    print(f"API Aviso: MIN_NIVEL não definido no .env. Usando padrão: {DEFAULT_MIN_NIVEL}")
-    MIN_NIVEL_VALUE = DEFAULT_MIN_NIVEL
-
-# Tenta ler e converter MAX_NIVEL
-max_nivel_str = os.getenv("MAX_NIVEL")
-if max_nivel_str is not None:
-    try:
-        MAX_NIVEL_VALUE = float(max_nivel_str)
-        print(f"API Info: Usando MAX_NIVEL do .env: {MAX_NIVEL_VALUE}")
-        # Adiciona uma verificação para evitar divisão por zero ou por valor menor/igual ao mínimo
-        if MAX_NIVEL_VALUE <= MIN_NIVEL_VALUE:
-             print(f"API Erro: MAX_NIVEL ({MAX_NIVEL_VALUE}) deve ser maior que MIN_NIVEL ({MIN_NIVEL_VALUE}). Usando padrão para MAX_NIVEL: {DEFAULT_MAX_NIVEL}")
-             MAX_NIVEL_VALUE = DEFAULT_MAX_NIVEL
-    except ValueError:
-        print(f"API Erro: Valor inválido para MAX_NIVEL ('{max_nivel_str}') no .env. Usando padrão: {DEFAULT_MAX_NIVEL}")
-        MAX_NIVEL_VALUE = DEFAULT_MAX_NIVEL
-else:
-    print(f"API Aviso: MAX_NIVEL não definido no .env. Usando padrão: {DEFAULT_MAX_NIVEL}")
-    MAX_NIVEL_VALUE = DEFAULT_MAX_NIVEL
+MIN_NIVEL_VALUE = int(os.getenv("MIN_NIVEL",1100.0))
+MAX_NIVEL_VALUE = int(os.getenv("MAX_NIVEL",53.0))
 
 # --- Configuração da Aplicação FastAPI ---
 app = FastAPI(
