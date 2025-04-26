@@ -183,8 +183,8 @@ function App() {
                   <LoadingSpinner />
                 ) : ultimaLeitura ? (
                   <div className="text-slate-300 space-y-3 text-base sm:text-lg text-center sm:text-left">
-                    <p><span className="font-medium text-slate-100">Nível:</span>{' '}{typeof ultimaLeitura.distancia === 'number' ? `${ultimaLeitura.distancia.toFixed(1)} cm` : 'Indisponível'}</p>
-                    <p><span className="font-medium text-slate-100">Porcentagem:</span>{' '}{typeof ultimaLeitura.nivel === 'number' ? `${ultimaLeitura.nivel.toFixed(1)} %` : 'Indisponível'}</p>
+                    <p><span className="font-medium text-slate-100">Nível:</span>{' '}{typeof ultimaLeitura.distancia === 'number' ? `${ultimaLeitura.distancia.toFixed(0)} cm` : 'Indisponível'}</p>
+                    <p><span className="font-medium text-slate-100">Porcentagem:</span>{' '}{typeof ultimaLeitura.nivel === 'number' ? `${ultimaLeitura.nivel.toFixed(0)} %` : 'Indisponível'}</p>
                     <p><span className="font-medium text-slate-100">Data:</span>{' '}{formatUltimaLeituraTimestamp(ultimaLeitura.timestamp || ultimaLeitura.created_on)}</p>
                   </div>
                 ) : !erro ? (
