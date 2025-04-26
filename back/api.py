@@ -101,8 +101,8 @@ def get_ultima_leitura():
 
         # Verifica se um resultado foi encontrado
         if result:
-            min_nivel = os.getenv("MIN_NIVEL") 
-            max_nivel = os.getenv("MAX_NIVEL")
+            min_nivel = os.getenv("MIN_NIVEL",11) 
+            max_nivel = os.getenv("MAX_NIVEL",53)
             # 1. Processa o Timestamp para o fuso horário de Recife
             original_datetime = result['created_on']
             # Garante que o datetime seja 'aware' (tenha fuso horário), assumindo UTC se for 'naive'
