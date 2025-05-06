@@ -14,8 +14,6 @@ import pytz
 load_dotenv() # Ainda necessário para as variáveis do banco de dados
 
 # --- CONFIGURAÇÕES FIXAS DE NÍVEL ---
-# Define os valores mínimo e máximo diretamente no código.
-# Usar float (com .0) é uma boa prática para cálculos que envolvem divisão.
 MIN_NIVEL_VALUE = int(os.getenv("MIN_NIVEL"))
 MAX_NIVEL_VALUE = int(os.getenv("MAX_NIVEL"))
 
@@ -64,6 +62,31 @@ def connect_db():
     except psycopg2.Error as e: print(f"API Erro psycopg2 ao conectar ao banco de dados: {e}"); return None
     except Exception as e: print(f"API Erro INESPERADO durante a conexão com o banco de dados: {e}"); return None
 
+# --- Função Auxiliar para Calcular Nível ---
+def calcular_nivel_percentual(distancia_original: float | int | None, min_val: int, max_val: int) -> int | None:
+    """
+    Calcula o nível como porcentagem com base na distância e nos valores min/max.
+    Retorna um inteiro (0-100) ou None se a distância não for válida.
+    """
+    if not isinstance(distancia_original, (int, float)):
+        return None
+
+    # Calcula o tamanho total do intervalo válido
+    range_nivel = max_val - min_val
+
+    # Verifica se o intervalo é válido (evita divisão por zero)
+    if range_nivel == 0:
+        # print("API Aviso: MIN_NIVEL_VALUE e MAX_NIVEL_VALUE são iguais. Nível definido como 0%.") # Evitar spam no log se chamado em loop
+        return 0 # Nível é 0 se o range for 0
+
+    # Calcula onde a distância atual se encontra dentro do intervalo (valor entre 0 e 1 geralmente)
+    # Lembre-se: menor distância = maior nível (reservatório mais cheio)
+    nivel_normalizado = 1 - ((distancia_original - min_val) / range_nivel)
+    # Converte para porcentagem e garante que fique entre 0 e 100
+    nivel_percentual = max(0.0, min(100.0, nivel_normalizado * 100.0))
+
+    return round(nivel_percentual)
+
 # --- Endpoints da API ---
 
 @app.get("/leituras/ultima", summary="Obter a última leitura (distância e nível calculado)")
@@ -83,7 +106,7 @@ def get_ultima_leitura():
             result = cur.fetchone()
 
         if result:
-            # 1. Processa o Timestamp (igual a antes)
+            # 1. Processa o Timestamp
             original_datetime = result['created_on']
             if original_datetime.tzinfo is None:
                 print(f"AVISO (ID: {result['id']}): Timestamp do DB veio como naive. Assumindo UTC.")
@@ -92,27 +115,9 @@ def get_ultima_leitura():
             local_datetime = original_datetime.astimezone(local_timezone)
             result['created_on'] = local_datetime.isoformat()
 
-            # 2. Calcula e Adiciona o Nível (usando valores fixos)
+            # 2. Calcula e Adiciona o Nível
             distancia_original = result.get('distancia')
-            if isinstance(distancia_original, (int, float)):
-                # Calcula o tamanho total do intervalo válido
-                range_nivel = MAX_NIVEL_VALUE - MIN_NIVEL_VALUE
-
-                # Verifica se o intervalo é válido (evita divisão por zero)
-                if range_nivel == 0:
-                    print("API Aviso: MIN_NIVEL_VALUE e MAX_NIVEL_VALUE são iguais. Nível definido como 0%.")
-                    nivel_percentual = 0.0
-                else:
-                    # Calcula onde a distância atual se encontra dentro do intervalo (valor entre 0 e 1 geralmente)
-                    nivel_normalizado = 1-((distancia_original - MIN_NIVEL_VALUE) / range_nivel)
-                    # Converte para porcentagem e garante que fique entre 0 e 100
-                    nivel_percentual = max(0.0, min(100.0, nivel_normalizado * 100.0))
-
-                # Adiciona o nível calculado (como porcentagem) ao resultado
-                result['nivel'] = round(nivel_percentual)
-            else:
-                # Se a distância não for um número, o nível também não pode ser calculado
-                result['nivel'] = None
+            result['nivel'] = calcular_nivel_percentual(distancia_original, MIN_NIVEL_VALUE, MAX_NIVEL_VALUE)
 
             # 3. Retorna o dicionário completo
             return result
@@ -132,14 +137,13 @@ def get_ultima_leitura():
             except psycopg2.Error as close_err:
                 print(f"API Erro ao fechar conexão DB em /leituras/ultima: {close_err}")
 
-# (Função get_leituras_por_periodo permanece exatamente igual a antes)
-@app.get("/leituras", summary="Obter leituras de distância em um período")
+@app.get("/leituras", summary="Obter leituras de distância e nível em um período")
 def get_leituras_por_periodo(
     periodo_horas: int = 24
 ):
     """
-    Busca leituras de DISTÂNCIA dentro de um período e as retorna com o fuso horário de Recife.
-    (Não calcula o 'nivel' para o histórico).
+    Busca leituras de DISTÂNCIA dentro de um período, calcula o 'nivel' para cada uma,
+    e as retorna com o fuso horário de Recife.
     """
     conn = None
     try:
@@ -158,12 +162,18 @@ def get_leituras_por_periodo(
         local_timezone = pytz.timezone('America/Recife')
         leituras_processadas = []
         for leitura in resultados:
+            # Processa o Timestamp
             original_datetime = leitura['created_on']
             if original_datetime.tzinfo is None:
                  print(f"AVISO (ID: {leitura['id']}): Timestamp do DB veio como naive. Assumindo UTC.")
                  original_datetime = original_datetime.replace(tzinfo=timezone.utc)
             local_datetime = original_datetime.astimezone(local_timezone)
             leitura['created_on'] = local_datetime.isoformat()
+
+            # Calcula e Adiciona o Nível
+            distancia_original = leitura.get('distancia')
+            leitura['nivel'] = calcular_nivel_percentual(distancia_original, MIN_NIVEL_VALUE, MAX_NIVEL_VALUE)
+
             leituras_processadas.append(leitura)
 
         return leituras_processadas
@@ -180,8 +190,6 @@ def get_leituras_por_periodo(
             except psycopg2.Error as close_err:
                 print(f"API Erro ao fechar conexão DB em /leituras: {close_err}")
 
-
-# (Seção if __name__ == "__main__": permanece igual a antes)
 if __name__ == "__main__":
     import uvicorn
     print("Executando API diretamente com Uvicorn (para teste)...")
