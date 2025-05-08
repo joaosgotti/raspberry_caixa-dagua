@@ -4,8 +4,15 @@ import sys
 from dotenv import load_dotenv
 
 # Carrega variáveis do .env para o ambiente
-load_dotenv()
-print("[Config] Arquivo .env carregado.")
+dotenv_file_path = os.path.join(os.path.dirname(__file__), '.env-rasp')
+
+if not load_dotenv(dotenv_path=dotenv_file_path, override=True):
+    print(f"[Config] ERRO CRÍTICO: Arquivo de configuração '{dotenv_file_path}' não encontrado ou não pôde ser lido.")
+    print("[Config] Verifique se o arquivo existe no local correto e tem permissões de leitura.")
+    print("[Config] O programa não pode continuar sem as configurações.")
+    sys.exit(1)
+else:
+    print(f"[Config] Arquivo '{dotenv_file_path}' carregado com sucesso (com override).")
 
 # --- Configurações MQTT ---
 MQTT_BROKER = os.getenv("MQTT_BROKER")
@@ -19,6 +26,8 @@ MQTT_KEEPALIVE_STR = os.getenv("MQTT_KEEPALIVE")
 GPIO_TRIG_PIN_STR = os.getenv("GPIO_TRIG_PIN")
 GPIO_ECHO_PIN_STR = os.getenv("GPIO_ECHO_PIN")
 PUBLISH_INTERVAL_SECONDS_STR = os.getenv("PUBLISH_INTERVAL_SECONDS")
+MIN_NIVEL = os.getenv("MIN_NIVEL")
+MAX_NIVEL = os.getenv("MAX_NIVEL")
 
 # --- Configurações Banco de Dados ---
 DB_HOST = os.getenv("DB_HOST")
@@ -31,17 +40,6 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 def get_int_env(var_str, var_name, default=None):
     """
     Valida e converte uma variável de ambiente para inteiro.
-
-    Args:
-        var_str (str | None): A string da variável de ambiente a ser convertida.
-        var_name (str): O nome da variável para mensagens de erro/aviso.
-        default (int | None): Valor padrão caso a variável não esteja definida.
-
-    Returns:
-        int | None: O valor inteiro da variável ou o valor padrão.
-
-    Raises:
-        SystemExit: Se a variável for obrigatória e não estiver definida ou não for um inteiro.
     """
     if var_str is None:
         if default is not None:
