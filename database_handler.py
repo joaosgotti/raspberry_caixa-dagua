@@ -1,7 +1,30 @@
 # database_handler.py
-import psycopg2
+import psycopg2 
 import config
-from datetime import datetime
+from datetime import datetime, timezone
+
+# --- Imports do SQLAlchemy ---
+from sqlalchemy import create_engine, Column, Integer, Float, DateTime, MetaData, Table
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.exc import SQLAlchemyError # Para capturar erros do SQLAlchemy
+
+# --- Definição do Modelo SQLAlchemy ---
+Base = declarative_base()
+
+class Leitura(Base):
+    """
+    Modelo SQLAlchemy que representa a tabela 'leituras'.
+    """
+    __tablename__ = 'leituras'  # Nome exato da sua tabela no banco de dados
+
+    id = Column(Integer, primary_key=True, autoincrement=True) # Assumindo que você tem um ID autoincrementável
+    distancia = Column(Float, nullable=False)
+    created_on = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    def __repr__(self):
+        return f"<Leitura(id={self.id}, distancia={self.distancia}, created_on='{self.created_on}')>"
+
 
 class DatabaseHandler:
     """Lida com a conexão e inserção no banco de dados PostgreSQL."""
@@ -30,13 +53,6 @@ class DatabaseHandler:
     def insert_reading(self, distancia: float, created_on_dt: datetime) -> bool:
         """
         Insere uma leitura de distância na tabela 'leituras'.
-
-        Args:
-            distancia (float): O valor da distância lida pelo sensor.
-            created_on_dt (datetime): O timestamp da leitura.
-
-        Returns:
-            bool: True se a inserção foi bem-sucedida, False caso contrário.
         """
         sql = "INSERT INTO leituras (distancia, created_on) VALUES (%s, %s);"
         conn = self._get_connection()

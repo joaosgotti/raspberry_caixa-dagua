@@ -4,7 +4,7 @@ import sys
 from dotenv import load_dotenv
 
 # Carrega variáveis do .env para o ambiente
-dotenv_file_path = os.path.join(os.path.dirname(__file__), '.env-raspberry')
+dotenv_file_path = os.path.join(os.path.dirname(__file__), '.env')
 
 if not load_dotenv(dotenv_path=dotenv_file_path, override=True):
     print(f"[Config] ERRO CRÍTICO: Arquivo de configuração '{dotenv_file_path}' não encontrado ou não pôde ser lido.")
