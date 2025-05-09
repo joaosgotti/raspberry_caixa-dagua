@@ -29,6 +29,7 @@ SETTLE_TIME_S = float(os.getenv("SETTLE_TIME_S"))
 MAX_ECHO_WAIT_S = float(os.getenv("MAX_ECHO_WAIT_S"))
 MAX_VALID_PULSE_S = float(os.getenv("MAX_VALID_PULSE_S"))
 MIN_VALID_PULSE_S = float(os.getenv("MIN_VALID_PULSE_S"))
+TOLERANCIA = float(os.getenv("TOLERANCIA")) 
 
 def run_publisher_with_sensor():
     """
@@ -46,7 +47,7 @@ def run_publisher_with_sensor():
             median_distance_value = sensor_reader.get_median_distance()
             if median_distance_value is not None:
                 # Validação básica da MEDIANA lida
-                if MIN_NIVEL <= median_distance_value <= MAX_NIVEL:
+                if MIN_NIVEL*(1-TOLERANCIA) < median_distance_value <= MAX_NIVEL*(1+TOLERANCIA):
                     print(f"Mediana do sensor: {median_distance_value} cm (Válida)")
 
                     created_on = datetime.now().isoformat() # Usa o timezone UTC e formato ISO
