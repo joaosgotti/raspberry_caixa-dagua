@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError # Para capturar erros do SQLAlchemy
 import os
 from dotenv import load_dotenv
 
-
+print("[Models] Carregando variáveis de ambiente do arquivo .env...")
 DATABASE_URL = f'postgresql://{os.getenv("DB_USER")}:{os.getenv("DB_PASSWORD")}@{os.getenv("DB_HOST")}:{os.getenv("DB_PORT")}/{os.getenv("DB_NAME")}'
 
 engine = create_engine("DATABASE_URL")
