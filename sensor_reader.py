@@ -4,6 +4,10 @@ import RPi.GPIO as GPIO
 import time
 import statistics
 import os        
+from dotenv import load_dotenv
+
+# Carrega as variáveis do arquivo .env
+load_dotenv()
 
 def setup_gpio():
     """Inicializa os pinos GPIO para o sensor. Chamado uma vez pelo script principal."""

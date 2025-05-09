@@ -5,6 +5,10 @@ import os
 import time
 from datetime import datetime
 from database_handler import DatabaseHandler
+from dotenv import load_dotenv
+
+# Carrega as variáveis do arquivo .env
+load_dotenv()
 
 
 def run_publisher_with_sensor():
