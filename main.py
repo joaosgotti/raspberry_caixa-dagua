@@ -47,7 +47,7 @@ def run_publisher_with_sensor():
             median_distance_value = sensor_reader.get_median_distance()
             if median_distance_value is not None:
                 # Validação básica da MEDIANA lida
-                if MIN_NIVEL*(1-TOLERANCIA) < median_distance_value <= MAX_NIVEL*(1+TOLERANCIA):
+                if (MIN_NIVEL*(1-TOLERANCIA)) < median_distance_value < (MAX_NIVEL*(1+TOLERANCIA)):
                     print(f"Mediana do sensor: {median_distance_value} cm (Válida)")
 
                     created_on = datetime.now().isoformat() # Usa o timezone UTC e formato ISO
