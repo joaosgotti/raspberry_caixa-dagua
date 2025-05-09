@@ -15,23 +15,29 @@ def run_publisher_with_sensor():
         print("ERRO CRÍTICO: Falha ao inicializar GPIO. Encerrando.")
         return
 
-    while True:
-        cycle_start_time = time.time()
+    try:
 
-        # Lê a MEDIANA da distância
-        median_distance_value = sensor_reader.get_median_distance()
+        while True:
 
-        if median_distance_value is not None:
-            # Validação básica da MEDIANA lida
-            if os.getenv("MIN_NIVEL") < median_distance_value < os.getenv("MAX_NIVEL"):
-                print(f"Mediana do sensor: {median_distance_value:.1f} cm (Válida)")
+            # Lê a MEDIANA da distância
+            median_distance_value = sensor_reader.get_median_distance()
 
-                created_on = datetime.now().isoformat() # Usa o timezone UTC e formato ISO
-                DatabaseHandler().insert_reading(median_distance_value, created_on)
+            if median_distance_value is not None:
+                # Validação básica da MEDIANA lida
+                if os.getenv("MIN_NIVEL") < median_distance_value < os.getenv("MAX_NIVEL"):
+                    print(f"Mediana do sensor: {median_distance_value:.1f} cm (Válida)")
+
+                    created_on = datetime.now().isoformat() # Usa o timezone UTC e formato ISO
+                    DatabaseHandler().insert_reading(median_distance_value, created_on)
+                else:
+                    print(f"Mediana do sensor: {median_distance_value:.1f} cm (Fora da faixa esperada, ignorando)")
             else:
-                print(f"Mediana do sensor: {median_distance_value:.1f} cm (Fora da faixa esperada, ignorando)")
-        else:
-            print("[Publisher Main] Falha ao obter a mediana do sensor. Pulando a publicação.")
+                print("[Publisher Main] Falha ao obter a mediana do sensor. Pulando a publicação.")
 
-        sleep_time = os.getenv("PUBLISH_INTERVAL_SECONDS") 
-        time.sleep(sleep_time) # Aguarda o intervalo definido antes de repetir o ciclo
+            sleep_time = os.getenv("PUBLISH_INTERVAL_SECONDS") 
+            time.sleep(sleep_time) # Aguarda o intervalo definido antes de repetir o ciclo
+
+    except Exception:
+        print("ERRO CRÍTICO: Falha inesperada no loop principal do publicador.")
+        import traceback
+        traceback.print_exc()
