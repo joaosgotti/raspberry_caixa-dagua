@@ -12,7 +12,7 @@ def setup_gpio():
         # load_dotenv()
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
-        GPIO.setup(int(os.getenv("GPIO_TRIG_PIN"))), GPIO.OUT)
+        GPIO.setup(int(os.getenv("GPIO_TRIG_PIN")), GPIO.OUT)
         GPIO.setup(int(os.getenv("GPIO_ECHO_PIN")), GPIO.IN)
         GPIO.output(int(os.getenv("GPIO_TRIG_PIN")), GPIO.LOW) # Garante que o pino TRIG comece em LOW
         time.sleep(float(os.getenv("STABILIZATION_TIME"))) # Pausa para estabilizar o sensor
