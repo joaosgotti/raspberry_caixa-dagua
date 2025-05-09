@@ -32,7 +32,7 @@ def run_publisher_with_sensor():
             else:
                 print("[Publisher Main] Falha ao obter a mediana do sensor. Pulando a publicação.")
 
-            sleep_time = os.getenv("PUBLISH_INTERVAL_SECONDS") 
+            sleep_time = float(os.getenv("PUBLISH_INTERVAL_SECONDS"))
             time.sleep(sleep_time) # Aguarda o intervalo definido antes de repetir o ciclo
 
     except Exception:
