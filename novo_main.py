@@ -4,8 +4,6 @@ import time
 from datetime import datetime
 from database_handler import DatabaseHandler
 
-
-
 def run_publisher_with_sensor():
     """Função principal para executar o ciclo de leitura da MEDIANA do sensor e publicação via MQTT."""
 
@@ -41,3 +39,5 @@ def run_publisher_with_sensor():
         print("ERRO CRÍTICO: Falha inesperada no loop principal do publicador.")
         import traceback
         traceback.print_exc()
+
+run_publisher_with_sensor()
