@@ -46,7 +46,7 @@ def run_publisher_with_sensor():
             # Lê a MEDIANA da distância
             median_distance_value = sensor_reader.get_median_distance()
             if median_distance_value is not None:
-                created_on = datetime.now().isoformat() # Usa o timezone UTC e formato ISO
+                created_on = datetime.now() # Usa o timezone UTC e formato ISO
                 print(f"Mediana do sensor: {median_distance_value} cm | created_on: {created_on}")
                 DatabaseHandler().insert_reading(median_distance_value, created_on)
 
