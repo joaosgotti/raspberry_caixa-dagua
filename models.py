@@ -1,9 +1,13 @@
+# models.py
+
 from datetime import datetime, timezone
 from sqlalchemy import create_engine, Column, Integer, Float, DateTime, MetaData, Table
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.exc import SQLAlchemyError # Para capturar erros do SQLAlchemy
 import os
+from dotenv import load_dotenv
+
 
 DATABASE_URL = f'postgresql://{os.getenv("DB_USER")}:{os.getenv("DB_PASSWORD")}@{os.getenv("DB_HOST")}:{os.getenv("DB_PORT")}/{os.getenv("DB_NAME")}'
 

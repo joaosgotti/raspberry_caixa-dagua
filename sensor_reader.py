@@ -1,4 +1,5 @@
 # sensor_reader.py
+
 import RPi.GPIO as GPIO
 import time
 import statistics
@@ -77,7 +78,6 @@ def read_distance():
 def get_median_distance():
     """
     Realiza múltiplas leituras de distância e retorna a mediana.
-    Chamado pelo script principal dentro do loop.
     """
     readings = []
     print(f"[Sensor Mod] Coletando leituras...")

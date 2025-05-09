@@ -1,4 +1,5 @@
 # database_handler.py
+
 from datetime import datetime
 from models import Leitura, Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -22,5 +23,3 @@ class DatabaseHandler:
             print(f"  [DB Handler] ERRO ao inserir no DB: {e}")
             session.rollback()
         return success
-    
-
