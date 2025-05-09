@@ -7,7 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 class DatabaseHandler:
     """Lida com a conexão e inserção no banco de dados PostgreSQL."""
 
-    def insert_reading(distancia: float, created_on_dt: datetime) -> bool:
+    def insert_reading(self, distancia: float, created_on_dt: datetime) -> bool:
         """
         Insere uma leitura de distância na tabela 'leituras' usando SQLAlchemy ORM.
         """
@@ -22,4 +22,6 @@ class DatabaseHandler:
         except SQLAlchemyError as e:
             print(f"  [DB Handler] ERRO ao inserir no DB: {e}")
             session.rollback()
+        finally:
+            session.close() # Certifique-se de fechar a sessão após a operação
         return success
