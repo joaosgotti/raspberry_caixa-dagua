@@ -6,12 +6,10 @@ import statistics
 import os        
 from dotenv import load_dotenv
 
-# Carrega as variáveis do arquivo .env
-load_dotenv()
-
 def setup_gpio():
     """Inicializa os pinos GPIO para o sensor. Chamado uma vez pelo script principal."""
     try:
+        load_dotenv()
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
         GPIO.setup(os.getenv("GPIO_TRIG_PIN"), GPIO.OUT)
