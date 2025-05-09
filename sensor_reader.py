@@ -35,7 +35,7 @@ def read_distance():
     Mede a distância usando o sensor HC-SR04.
     """
     # Adiciona um pequeno atraso antes de disparar para evitar ecos fantasmas da leitura anterior
-    time.sleep(int(os.getenv("SETTLE_TIME_S")))
+    time.sleep(float(os.getenv("SETTLE_TIME_S")))
 
     try:
         GPIO.output(int(os.getenv("GPIO_TRIG_PIN")), GPIO.HIGH)
