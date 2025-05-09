@@ -9,13 +9,13 @@ from dotenv import load_dotenv
 def setup_gpio():
     """Inicializa os pinos GPIO para o sensor. Chamado uma vez pelo script principal."""
     try:
-        load_dotenv()
+        # load_dotenv()
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
-        GPIO.setup(os.getenv("GPIO_TRIG_PIN"), GPIO.OUT)
-        GPIO.setup(os.getenv("GPIO_ECHO_PIN"), GPIO.IN)
-        GPIO.output(os.getenv("GPIO_TRIG_PIN"), GPIO.LOW) # Garante que o pino TRIG comece em LOW
-        time.sleep(os.getenv("STABILIZATION_TIME")) # Pausa para estabilizar o sensor
+        GPIO.setup(int(os.getenv("GPIO_TRIG_PIN"))), GPIO.OUT)
+        GPIO.setup(int(os.getenv("GPIO_ECHO_PIN")), GPIO.IN)
+        GPIO.output(int(os.getenv("GPIO_TRIG_PIN")), GPIO.LOW) # Garante que o pino TRIG comece em LOW
+        time.sleep(float(os.getenv("STABILIZATION_TIME"))) # Pausa para estabilizar o sensor
         print("[Sensor Mod] GPIO configurado com sucesso.")
         return True
     except Exception as e:
@@ -25,7 +25,7 @@ def setup_gpio():
 def cleanup_gpio():
     """Libera os recursos GPIO utilizados. Chamado uma vez pelo script principal no final."""
     try:
-        GPIO.cleanup((os.getenv("GPIO_TRIG_PIN"), os.getenv("GPIO_ECHO_PIN")))
+        GPIO.cleanup((int(os.getenv("GPIO_TRIG_PIN")), int(os.getenv("GPIO_ECHO_PIN"))))
         print("[Sensor Mod] GPIO limpo.")
     except Exception as e:
         print(f"[Sensor Mod] Aviso: Erro ao limpar GPIO (pode já ter sido limpo ou setup falhou): {e}")
@@ -38,16 +38,16 @@ def read_distance():
     time.sleep(int(os.getenv("SETTLE_TIME_S")))
 
     try:
-        GPIO.output(os.getenv("GPIO_TRIG_PIN"), GPIO.HIGH)
+        GPIO.output(int(os.getenv("GPIO_TRIG_PIN")), GPIO.HIGH)
         time.sleep(float(os.getenv("TRIGGER_PULSE_DURATION_S")))
-        GPIO.output(os.getenv("GPIO_TRIG_PIN"), GPIO.LOW)
+        GPIO.output(int(os.getenv("GPIO_TRIG_PIN")), GPIO.LOW)
 
         # Medição do tempo de eco
         pulse_start_time = time.time()
         timeout_limit = pulse_start_time + float(os.getenv("MAX_ECHO_WAIT_S"))
 
         # Espera o pino ECHO ir para HIGH (início do pulso)
-        while GPIO.input(os.getenv("GPIO_ECHO_PIN")) == GPIO.LOW:
+        while GPIO.input(int(os.getenv("GPIO_ECHO_PIN"))) == GPIO.LOW:
             pulse_start_time = time.time()
             if pulse_start_time > timeout_limit:
                 return None
@@ -56,7 +56,7 @@ def read_distance():
         timeout_limit = pulse_end_time + 2*float(os.getenv("MAX_ECHO_WAIT_S"))
 
         # Espera o pino ECHO ir para LOW (fim do pulso)
-        while GPIO.input(os.getenv("GPIO_ECHO_PIN")) == GPIO.HIGH:
+        while GPIO.input(int(os.getenv("GPIO_ECHO_PIN"))) == GPIO.HIGH:
             pulse_end_time = time.time()
             if pulse_end_time > timeout_limit:
                 return None
