@@ -46,7 +46,7 @@ def run_publisher_with_sensor():
             median_distance_value = sensor_reader.get_median_distance()
             if median_distance_value is not None:
                 # Validação básica da MEDIANA lida
-                if float(os.getenv("MIN_NIVEL")) < median_distance_value < float(os.getenv("MAX_NIVEL")):
+                if MIN_NIVEL < median_distance_value < MAX_NIVEL:
                     print(f"Mediana do sensor: {median_distance_value} cm (Válida)")
 
                     created_on = datetime.now().isoformat() # Usa o timezone UTC e formato ISO
@@ -56,7 +56,7 @@ def run_publisher_with_sensor():
             else:
                 print("[Publisher Main] Falha ao obter a mediana do sensor. Pulando a publicação.")
 
-            sleep_time = int(os.getenv("PUBLISH_INTERVAL_SECONDS"))
+            sleep_time = PUBLISH_INTERVAL_SECONDS
             time.sleep(sleep_time) 
 
     except Exception:
