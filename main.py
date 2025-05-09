@@ -10,6 +10,29 @@ from dotenv import load_dotenv
 # Carrega as variáveis do arquivo .env
 load_dotenv()
 
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+
+GPIO_TRIG_PIN = int(os.getenv("GPIO_TRIG_PIN"))
+GPIO_ECHO_PIN = int(os.getenv("GPIO_ECHO_PIN"))
+PUBLISH_INTERVAL_SECONDS = int(os.getenv("PUBLISH_INTERVAL_SECONDS"))
+
+MIN_NIVEL = float(os.getenv("MIN_NIVEL"))
+MAX_NIVEL = float(os.getenv("MAX_NIVEL"))
+
+NUM_READINGS_PER_CYCLE = int(os.getenv("NUM_READINGS_PER_CYCLE"))
+READING_INTERVAL_SECONDS = float(os.getenv("READING_INTERVAL_SECONDS"))
+STABILIZATION_TIME = float(os.getenv("STABILIZATION_TIME"))
+
+SPEED_OF_SOUND_CM_S = float(os.getenv("SPEED_OF_SOUND_CM_S"))
+TRIGGER_PULSE_DURATION_S = float(os.getenv("TRIGGER_PULSE_DURATION_S"))
+SETTLE_TIME_S = float(os.getenv("SETTLE_TIME_S"))
+MAX_ECHO_WAIT_S = float(os.getenv("MAX_ECHO_WAIT_S"))
+MAX_PULSE_DURATION_S = float(os.getenv("MAX_PULSE_DURATION_S"))
+MIN_VALID_PULSE_S = float(os.getenv("MIN_VALID_PULSE_S"))
 
 def run_publisher_with_sensor():
     """
