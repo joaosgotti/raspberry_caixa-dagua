@@ -27,7 +27,7 @@ SPEED_OF_SOUND_CM_S = float(os.getenv("SPEED_OF_SOUND_CM_S"))
 TRIGGER_PULSE_DURATION_S = float(os.getenv("TRIGGER_PULSE_DURATION_S"))
 SETTLE_TIME_S = float(os.getenv("SETTLE_TIME_S"))
 MAX_ECHO_WAIT_S = float(os.getenv("MAX_ECHO_WAIT_S"))
-MAX_PULSE_DURATION_S = float(os.getenv("MAX_PULSE_DURATION_S"))
+MAX_VALID_PULSE_S = float(os.getenv("MAX_VALID_PULSE_S"))
 MIN_VALID_PULSE_S = float(os.getenv("MIN_VALID_PULSE_S"))
 
 def run_publisher_with_sensor():
