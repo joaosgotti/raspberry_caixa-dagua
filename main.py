@@ -7,7 +7,6 @@ from datetime import datetime
 from database_handler import DatabaseHandler
 
 
-
 def run_publisher_with_sensor():
     """
     Função principal para executar o ciclo de leitura da MEDIANA do sensor e publicação via MQTT.
