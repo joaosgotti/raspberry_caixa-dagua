@@ -9,9 +9,13 @@ import os
 from dotenv import load_dotenv
 
 print("[Models] Carregando variáveis de ambiente do arquivo .env...")
+print(os.getenv("DB_USER"))
 DATABASE_URL = f'postgresql://{os.getenv("DB_USER")}:{os.getenv("DB_PASSWORD")}@{os.getenv("DB_HOST")}:{os.getenv("DB_PORT")}/{os.getenv("DB_NAME")}'
 
-engine = create_engine("DATABASE_URL")
+
+
+
+engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
 
