@@ -6,11 +6,11 @@ import time
 from datetime import datetime
 from database_handler import DatabaseHandler
 from dotenv import load_dotenv
+from collections import deque
+import statistics
 
 # Carrega as variáveis do arquivo .env
 load_dotenv()
-
-
 
 GPIO_TRIG_PIN = int(os.getenv("GPIO_TRIG_PIN"))
 GPIO_ECHO_PIN = int(os.getenv("GPIO_ECHO_PIN"))
@@ -30,11 +30,17 @@ MAX_ECHO_WAIT_S = float(os.getenv("MAX_ECHO_WAIT_S"))
 MAX_VALID_PULSE_S = float(os.getenv("MAX_VALID_PULSE_S"))
 MIN_VALID_PULSE_S = float(os.getenv("MIN_VALID_PULSE_S"))
 TOLERANCIA = float(os.getenv("TOLERANCIA"))
+MOVING_AVERAGE_WINDOW = float(os.getenv("MOVING_AVERAGE_WINDOW"))
 
+MAX_NIVEL_TOL = MAX_NIVEL*(1+TOLERANCIA)
+MIN_NIVEL_TOL = MIN_NIVEL*(1-TOLERANCIA)
+
+recent_readings = deque(maxlen=MOVING_AVERAGE_WINDOW)
 
 def run_publisher_with_sensor():
     """
-    Função principal para executar o ciclo de leitura da MEDIANA do sensor e publicação via MQTT.
+    Função principal para executar o ciclo de leitura da MEDIANA do sensor,
+    aplicar média móvel e publicar/inserir no banco de dados.
     """
 
     print("Inicializando GPIO via sensor_reader...")
@@ -44,18 +50,25 @@ def run_publisher_with_sensor():
 
     try:
         while True:
-            # Lê a MEDIANA da distância
             median_distance_value = sensor_reader.get_median_distance()
-            if (median_distance_value is not None) and ((median_distance_value > MIN_NIVEL*(1-TOLERANCIA)) or (median_distance_value > MAX_NIVEL*(1+TOLERANCIA))):
-                created_on = datetime.now() # Usa o timezone UTC e formato ISO
-                print(f"Mediana do sensor: {median_distance_value} cm | created_on: {created_on}")
-                DatabaseHandler().insert_reading(median_distance_value, created_on)
+            if median_distance_value is not None:
+                recent_readings.append(median_distance_value)
 
+                if len(recent_readings) == MOVING_AVERAGE_WINDOW:
+                    moving_average = round(statistics.mean(recent_readings), 1)
+
+                    if moving_average > MIN_NIVEL_TOL or moving_average > MAX_NIVEL_TOL:
+                        created_on = datetime.now()
+                        print(f"Média Móvel: {moving_average} cm | created_on: {created_on}")
+                        DatabaseHandler().insert_reading(moving_average, created_on)
+                    else:
+                        print("[Publisher Main] Média móvel fora do intervalo esperado. Pulando a inserção.")
+                else:
+                    print(f"[Publisher Main] Aguardando mais leituras para média móvel ({len(recent_readings)}/{MOVING_AVERAGE_WINDOW})")
             else:
-                print("[Publisher Main] Falha ao obter a mediana do sensor. Pulando a publicação.")
+                print("[Publisher Main] Falha ao obter a mediana do sensor. Pulando.")
 
-            sleep_time = PUBLISH_INTERVAL_SECONDS
-            time.sleep(sleep_time) 
+            time.sleep(PUBLISH_INTERVAL_SECONDS)
 
     except Exception:
         print("ERRO CRÍTICO: Falha inesperada no loop principal do publicador.")
