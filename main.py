@@ -32,7 +32,9 @@ MIN_VALID_PULSE_S = float(os.getenv("MIN_VALID_PULSE_S"))
 TOLERANCIA = float(os.getenv("TOLERANCIA"))
 MOVING_AVERAGE_WINDOW = float(os.getenv("MOVING_AVERAGE_WINDOW"))
 
-recent_readings = deque(maxlen=MOVING_AVERAGE_WINDOW)
+#recent_readings = deque(maxlen=MOVING_AVERAGE_WINDOW)
+recent_readings = deque(maxlen=100)
+
 
 def run_publisher_with_sensor():
     """
