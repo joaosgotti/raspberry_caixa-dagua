@@ -32,9 +32,6 @@ MIN_VALID_PULSE_S = float(os.getenv("MIN_VALID_PULSE_S"))
 TOLERANCIA = float(os.getenv("TOLERANCIA"))
 MOVING_AVERAGE_WINDOW = float(os.getenv("MOVING_AVERAGE_WINDOW"))
 
-MAX_NIVEL_TOL = MAX_NIVEL*(1+TOLERANCIA)
-MIN_NIVEL_TOL = MIN_NIVEL*(1-TOLERANCIA)
-
 recent_readings = deque(maxlen=MOVING_AVERAGE_WINDOW)
 
 def run_publisher_with_sensor():
@@ -55,9 +52,9 @@ def run_publisher_with_sensor():
                 recent_readings.append(median_distance_value)
 
                 if len(recent_readings) == MOVING_AVERAGE_WINDOW:
-                    moving_average = round(statistics.mean(recent_readings), 1)
+                    moving_average = round(statistics.mean(recent_readings))
 
-                    if moving_average > MIN_NIVEL_TOL or moving_average > MAX_NIVEL_TOL:
+                    if moving_average > MIN_NIVEL*(1-TOLERANCIA) or moving_average > MAX_NIVEL*(1+TOLERANCIA):
                         created_on = datetime.now()
                         print(f"Média Móvel: {moving_average} cm | created_on: {created_on}")
                         DatabaseHandler().insert_reading(moving_average, created_on)
