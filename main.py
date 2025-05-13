@@ -56,7 +56,7 @@ def run_publisher_with_sensor():
                     moving_average = round(statistics.mean(recent_readings))
 
                     if moving_average > MIN_NIVEL*(1-TOLERANCIA) or moving_average > MAX_NIVEL*(1+TOLERANCIA):
-                        created_on = datetime.now(timezone)
+                        created_on = datetime.now(timezone=True)
                         print(f"Média Móvel: {moving_average} cm | created_on: {created_on}")
                         DatabaseHandler().insert_reading(moving_average, created_on)
                     else:
