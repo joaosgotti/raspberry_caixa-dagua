@@ -53,7 +53,7 @@ def run_publisher_with_sensor():
                 recent_readings.append(median_distance_value)
 
                 if len(recent_readings) == MOVING_AVERAGE_WINDOW:
-                    moving_average = round(statistics.mean(recent_readings))
+                    moving_average = float(round(statistics.mean(recent_readings)))
 
                     if moving_average > MIN_NIVEL*(1-TOLERANCIA) or moving_average > MAX_NIVEL*(1+TOLERANCIA):
                         created_on = datetime.now(timezone.utc)

@@ -31,7 +31,7 @@ class Leitura(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True) # Assumindo que você tem um ID autoincrementável
     distancia = Column(Float, nullable=False)
-    created_on = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_on = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
         return f"<Leitura(id={self.id}, distancia={self.distancia}, created_on='{self.created_on}')>"

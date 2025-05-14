@@ -86,7 +86,7 @@ def read_distance():
              return None
 
         distance = (pulse_duration * SPEED_OF_SOUND_CM_S)/ 2 
-        return round(distance)
+        return float(round(distance))
 
     except RuntimeError as e:
         print(f"[Sensor Mod] Erro de Runtime GPIO na leitura: {e}")
@@ -110,7 +110,7 @@ def get_median_distance():
              time.sleep(READING_INTERVAL_SECONDS)
 
     if readings:
-        median_distance = round(statistics.median(readings))
+        median_distance = statistics.median(readings)
         print(f"[Sensor Mod] Mediana: {median_distance} cm.")
         return median_distance
     else:

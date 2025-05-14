@@ -17,7 +17,7 @@ class DatabaseHandler:
             nova_leitura = Leitura(distancia=distancia, created_on=created_on_dt)
             session.add(nova_leitura)
             session.commit()
-            print(f"  [DB Handler] Inserção OK: Dist={distancia:.1f}, CreatedOn={created_on_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"  [DB Handler] Inserção OK: Dist={distancia}, CreatedOn={created_on_dt.isoformat()}")
             success = True
         except SQLAlchemyError as e:
             print(f"  [DB Handler] ERRO ao inserir no DB: {e}")
